@@ -1,0 +1,13 @@
+langgraph
+langchain
+langchain_groq
+streamlit
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+xgboost
+python-dotenv
+tabulate
+pydantic-settings
