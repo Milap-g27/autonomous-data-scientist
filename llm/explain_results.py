@@ -25,10 +25,10 @@ def explain_results_node(state: dict) -> dict:
         eda_summary = f"Top correlated features: {state['eda_results']['top_correlated_features']}"
         
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert Data Scientist. Explain the results of the model training to a non-technical stakeholder."),
+        ("system", "You are an expert Data Scientist. Explain the results of the model training to a non-technical stakeholder. IMPORTANT: Always wrap column names, feature names, and variable names in backticks (` `) when mentioning them."),
         ("user", """
         Problem Type: {problem_type}
-        Target Variable: {target}
+        Target Variable: `{target}`
         
         Best Performing Model: {best_model}
         
@@ -42,6 +42,8 @@ def explain_results_node(state: dict) -> dict:
         1. Which model was best and why (based on metrics).
         2. What the metrics mean in plain English (e.g. valid accuracy or error).
         3. Any interesting patterns from the data insights.
+        
+        IMPORTANT: When referring to any column name or feature name, always wrap it in backticks like `column_name`.
         
         Keep it professional but accessible.
         """)

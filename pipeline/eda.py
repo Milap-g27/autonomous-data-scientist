@@ -65,7 +65,7 @@ def perform_eda(df: pd.DataFrame, target: str) -> tuple[dict, list]:
     sns.set_theme(style="whitegrid")
     
     # 2. Target Distribution
-    fig1, ax1 = plt.subplots(figsize=(6, 4)) # Reduced size from (8, 5)
+    fig1, ax1 = plt.subplots(figsize=(6, 4))
     if pd.api.types.is_numeric_dtype(df[target]):
         sns.histplot(df[target], kde=True, ax=ax1)
         ax1.set_title(f"Distribution of Target: {target}")
@@ -74,50 +74,33 @@ def perform_eda(df: pd.DataFrame, target: str) -> tuple[dict, list]:
         sns.countplot(y=df[target], ax=ax1)
         ax1.set_title(f"Count Plot of Target: {target}")
         desc1 = f"Count plot showing the frequency of each class in the target variable '{target}'."
-    figures.append({"figure": fig1, "description": desc1})
+    figures.append({"figure": fig1, "description": desc1, "heading": "Target Distribution"})
     
     # 3. Correlation Heatmap (numerical only)
     numeric_df = df_vis.select_dtypes(include=['number'])
     if not numeric_df.empty and len(numeric_df.columns) > 1:
-        fig2, ax2 = plt.subplots(figsize=(7, 5)) # Reduced from (10, 8)
+        fig2, ax2 = plt.subplots(figsize=(7, 5))
         corr = numeric_df.corr()
         sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', ax=ax2)
         ax2.set_title("Correlation Heatmap")
-        figures.append({"figure": fig2, "description": "Heatmap displaying the correlation coefficients between numerical features."})
+        figures.append({"figure": fig2, "description": "Heatmap displaying the correlation coefficients between numerical features.", "heading": "Correlation Heatmap"})
         
         # Identify top correlated features with target
         if target in corr.columns:
             target_corr = corr[target].abs().sort_values(ascending=False)
-            top_features = target_corr[1:6].index.tolist() # Top 5 excluding target itself
+            top_features = target_corr[1:6].index.tolist()
             results['top_correlated_features'] = top_features
         else:
             top_features = numeric_df.columns[:5].tolist()
     else:
         top_features = []
         
-    # 4. Scatter Plots for Top Correlated Features vs Target
-    # Limit to top 3 to avoid overcrowding
-    for feature in top_features[:3]:
-        fig, ax = plt.subplots(figsize=(6, 4)) # Reduced from (8, 5)
-        if pd.api.types.is_numeric_dtype(df[target]):
-            sns.scatterplot(data=df_vis, x=feature, y=target, ax=ax)
-            ax.set_title(f"{feature} vs {target}")
-            desc = f"Scatter plot showing the relationship between '{feature}' and the target '{target}'."
-        else:
-            sns.boxplot(data=df_vis, x=target, y=feature, ax=ax)
-            ax.set_title(f"{feature} by {target}")
-            desc = f"Boxplot showing the distribution of '{feature}' for each class of '{target}'."
-        figures.append({"figure": fig, "description": desc})
-        
-    # 5. Boxplots for Numerical Features to check outliers
+    # 4. Boxplots for Numerical Features to check outliers
     if top_features:
-        fig, ax = plt.subplots(figsize=(7, 4)) # Reduced from (10, 6)
-        # Melding for boxplot requires scaling if ranges differ wildly, 
-        # so let's just do individual boxplots for top 3 features
+        fig, ax = plt.subplots(figsize=(7, 4))
         data_to_plot = df_vis[top_features[:3]]
-        # Standardize for visualization if needed, but raw is often better for outlier detection
         sns.boxplot(data=data_to_plot, orient="h", ax=ax)
         ax.set_title("Boxplots of Top Features")
-        figures.append({"figure": fig, "description": f"Boxplots of top features {top_features[:3]} to visualize distributions and potential outliers."})
+        figures.append({"figure": fig, "description": f"Boxplots of top features {top_features[:3]} to visualize distributions and potential outliers.", "heading": "Outlier Detection — Boxplots"})
 
     return results, figures

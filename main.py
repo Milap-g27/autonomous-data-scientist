@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os
 import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
 
 # Import config and core logic
@@ -59,60 +61,248 @@ if uploaded_file is not None:
                     # Run the graph
                     result = graph.invoke(initial_state)
                     
+                    # Store results in session state so they persist across reruns
+                    st.session_state['result'] = result
+                    st.session_state['target'] = target
+                    st.session_state['df'] = df
+                    
                     status_container.success("Analysis Complete!")
                     
-                    # Create Tabs for Results
-                    tab1, tab2, tab3, tab4 = st.tabs(["📊 EDA & Insights", "🏆 Model Performance", "📝 AI Explanation", "⚙️ Processing Log"])
-                    
-                    with tab1:
-                        st.header("Exploratory Data Analysis")
-                        
-                        # Display EDA Stats
-                        if 'eda_results' in result:
-                            st.write("**Summary Statistics:**")
-                            st.json(result['eda_results']['description'])
-                        
-                        # Display Figures
-                        if 'eda_figures' in result:
-                            for idx, item in enumerate(result['eda_figures']):
-                                fig = item
-                                desc = ""
-                                if isinstance(item, dict):
-                                    fig = item.get('figure')
-                                    desc = item.get('description', '')
-                                
-                                c1, c2, c3 = st.columns([1, 2, 1])
-                                with c2:
-                                    st.pyplot(fig)
-                                    if desc:
-                                        st.caption(desc)
-                                st.markdown("---")
-                                
-                    with tab2:
-                        st.header("Model Evaluation")
-                        if 'metrics' in result:
-                            # Convert metrics dict to dataframe for nice display
-                            metrics_df = pd.DataFrame(result['metrics']).T
-                            st.table(metrics_df)
-                            
-                        st.success(f"**Best Performing Model:** {result.get('model_name', 'N/A')}")
-                        
-                    with tab3:
-                        st.header("AI Explanation")
-                        st.markdown(result.get('explanation', "No explanation generated."))
-                        
-                    with tab4:
-                        st.header("Processing Logs")
-                        st.subheader("Data Cleaning Report")
-                        st.text(result.get('cleaning_report', 'No report'))
-                        
-                        st.subheader("Feature Engineering Report")
-                        st.text(result.get('feature_report', 'No report'))
-                        
                 except Exception as e:
                     st.error(f"An error occurred during execution: {e}")
                     import traceback
                     st.text(traceback.format_exc())
+        
+        # Display results from session state (persists across reruns)
+        if 'result' in st.session_state:
+            result = st.session_state['result']
+            target = st.session_state['target']
+            df_original = st.session_state['df']
+            
+            # Create Tabs for Results
+            tab1, tab2, tab3, tab4 = st.tabs(["📊 EDA & Insights", "🏆 Model Performance", "📝 AI Explanation", "⚙️ Processing Log"])
+            
+            with tab1:
+                st.header("Exploratory Data Analysis")
+                
+                # Display EDA Stats
+                if 'eda_results' in result:
+                    st.subheader("📋 Summary Statistics")
+                    st.json(result['eda_results']['description'])
+                    
+                    # Missing Values & Unique Counts
+                    st.subheader("🔍 Missing Values & Unique Counts")
+                    info_data = {}
+                    for col in df_original.columns:
+                        info_data[col] = {
+                            'Missing Values': int(df_original[col].isnull().sum()),
+                            'Missing %': round(df_original[col].isnull().sum() / len(df_original) * 100, 2),
+                            'Unique Values': int(df_original[col].nunique()),
+                            'Data Type': str(df_original[col].dtype)
+                        }
+                    info_df = pd.DataFrame(info_data).T
+                    st.table(info_df)
+                
+                # Display Figures
+                if 'eda_figures' in result:
+                    for idx, item in enumerate(result['eda_figures']):
+                        fig = item
+                        desc = ""
+                        heading = ""
+                        if isinstance(item, dict):
+                            fig = item.get('figure')
+                            desc = item.get('description', '')
+                            heading = item.get('heading', '')
+                        
+                        if heading:
+                            st.subheader(heading)
+                        c1, c2, c3 = st.columns([1, 2, 1])
+                        with c2:
+                            st.pyplot(fig)
+                            if desc:
+                                st.caption(desc)
+                        st.markdown("---")
+                
+                # --- Feature Importance ---
+                best_model_name = result.get('model_name', '')
+                best_model = result.get('models', {}).get(best_model_name)
+                training_X = result.get('X', pd.DataFrame())
+                
+                if best_model and not training_X.empty:
+                    try:
+                        model_step = best_model
+                        if hasattr(model_step, 'named_steps') and 'model' in model_step.named_steps:
+                            model_step = model_step.named_steps['model']
+                        
+                        importances = None
+                        imp_label = 'Importance'
+                        imp_color = '#4CAF50'
+                        
+                        if hasattr(model_step, 'feature_importances_'):
+                            importances = model_step.feature_importances_
+                        elif hasattr(model_step, 'coef_'):
+                            coefs = model_step.coef_
+                            importances = np.abs(coefs).mean(axis=0) if coefs.ndim > 1 else np.abs(coefs)
+                            imp_label = '|Coefficient|'
+                            imp_color = '#FF9800'
+                        
+                        if importances is not None:
+                            st.subheader("📌 Feature Importance")
+                            feature_names = training_X.columns.tolist()
+                            feat_imp_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+                            feat_imp_df = feat_imp_df.sort_values('Importance', ascending=True).tail(15)
+                            
+                            fig_imp, ax_imp = plt.subplots(figsize=(8, 5))
+                            ax_imp.barh(feat_imp_df['Feature'], feat_imp_df['Importance'], color=imp_color)
+                            ax_imp.set_xlabel(imp_label)
+                            ax_imp.set_title(f'Feature Importance — {best_model_name}')
+                            plt.tight_layout()
+                            
+                            c1, c2, c3 = st.columns([1, 2, 1])
+                            with c2:
+                                st.pyplot(fig_imp)
+                            st.markdown("---")
+                    except Exception as e:
+                        st.warning(f"Could not generate feature importance: {e}")
+                
+                # --- Distribution of columns with <= 5 unique values ---
+                st.subheader("📊 Distribution of Categorical")
+                dist_cols = [c for c in df_original.columns if df_original[c].nunique() <= 5]
+                
+                if dist_cols:
+                    for feat in dist_cols:
+                        col_data = df_original[feat]
+                        fig_d, ax_d = plt.subplots(figsize=(6, 4))
+                        if pd.api.types.is_numeric_dtype(col_data):
+                            sns.histplot(col_data, kde=False, ax=ax_d, color='#2196F3', discrete=True)
+                            ax_d.set_title(f'Distribution of {feat}')
+                            desc_d = f"Bar chart showing the distribution of '{feat}' ({col_data.nunique()} unique values)."
+                        else:
+                            sns.countplot(y=col_data, ax=ax_d, color='#2196F3')
+                            ax_d.set_title(f'Count Plot of {feat}')
+                            desc_d = f"Count plot showing the frequency of each category in '{feat}' ({col_data.nunique()} unique values)."
+                        plt.tight_layout()
+                        
+                        c1, c2, c3 = st.columns([1, 2, 1])
+                        with c2:
+                            st.pyplot(fig_d)
+                            st.caption(desc_d)
+                        st.markdown("---")
+                else:
+                    st.info("No columns with 5 or fewer unique values found.")
+                            
+            with tab2:
+                st.header("Model Evaluation")
+                if 'metrics' in result:
+                    # Convert metrics dict to dataframe for nice display
+                    metrics_df = pd.DataFrame(result['metrics']).T
+                    st.table(metrics_df)
+                    
+                st.success(f"**Best Performing Model:** {result.get('model_name', 'N/A')}")
+                
+                # --- Prediction Section ---
+                st.markdown("---")
+                st.subheader("🔮 Predict with Best Model")
+                best_model_name = result.get('model_name', '')
+                best_model = result.get('models', {}).get(best_model_name)
+                training_X = result.get('X', pd.DataFrame())
+                problem_type = result.get('problem_type', '')
+                
+                if best_model and not training_X.empty:
+                    
+                    @st.fragment
+                    def prediction_fragment():
+                        st.info(f"Fill in the values below (same columns as your uploaded dataset) and click **Predict** to get a prediction from **{best_model_name}**.")
+                        
+                        # Show original dataset columns (excluding target)
+                        original_cols = [c for c in df_original.columns if c != target]
+                        
+                        with st.form("prediction_form"):
+                            input_data = {}
+                            cols_layout = st.columns(3)
+                            for i, col_name in enumerate(original_cols):
+                                with cols_layout[i % 3]:
+                                    if df_original[col_name].dtype == 'object' or df_original[col_name].dtype.name == 'category':
+                                        unique_vals = sorted(df_original[col_name].dropna().unique().tolist())
+                                        input_data[col_name] = st.selectbox(f"`{col_name}`", options=unique_vals)
+                                    elif df_original[col_name].dtype == 'bool':
+                                        input_data[col_name] = st.selectbox(f"`{col_name}`", options=[True, False])
+                                    elif pd.api.types.is_integer_dtype(df_original[col_name]):
+                                        min_val = int(df_original[col_name].min())
+                                        max_val = int(df_original[col_name].max())
+                                        median_val = int(df_original[col_name].median())
+                                        input_data[col_name] = st.number_input(
+                                            f"`{col_name}`", 
+                                            min_value=min_val, max_value=max_val,
+                                            value=median_val, step=1
+                                        )
+                                    elif pd.api.types.is_float_dtype(df_original[col_name]):
+                                        min_val = float(df_original[col_name].min())
+                                        max_val = float(df_original[col_name].max())
+                                        median_val = float(df_original[col_name].median())
+                                        input_data[col_name] = st.number_input(
+                                            f"`{col_name}`", 
+                                            min_value=min_val, max_value=max_val,
+                                            value=median_val, step=0.01, format="%.2f"
+                                        )
+                                    else:
+                                        input_data[col_name] = st.number_input(f"`{col_name}`", value=float(df_original[col_name].median()), step=0.01, format="%.2f")
+                            
+                            submitted = st.form_submit_button("🔮 Predict")
+                        
+                        if submitted:
+                            try:
+                                from pipeline.data_cleaning import clean_data
+                                from pipeline.feature_engineering import perform_feature_engineering
+                                
+                                # Build prediction row with a dummy target value
+                                pred_row = input_data.copy()
+                                if pd.api.types.is_numeric_dtype(df_original[target]):
+                                    pred_row[target] = 0
+                                else:
+                                    pred_row[target] = df_original[target].mode()[0]
+                                
+                                # Combine with original data so pipeline transformations are consistent
+                                pred_df = pd.DataFrame([pred_row])
+                                combined_df = pd.concat([df_original, pred_df], ignore_index=True)
+                                
+                                # Run through same pipeline
+                                cleaned_combined, _ = clean_data(combined_df)
+                                X_combined, _, _ = perform_feature_engineering(cleaned_combined, target, problem_type)
+                                
+                                # Extract last row (prediction input) and align to training columns
+                                X_pred = X_combined.iloc[[-1]]
+                                X_pred = X_pred.reindex(columns=training_X.columns, fill_value=0)
+                                
+                                prediction = best_model.predict(X_pred)
+                                predicted_value = prediction[0]
+                                
+                                # Reverse-map encoded prediction back to original label
+                                if df_original[target].dtype == 'object' or df_original[target].dtype.name == 'category':
+                                    from sklearn.preprocessing import LabelEncoder
+                                    le = LabelEncoder()
+                                    le.fit(df_original[target].astype(str))
+                                    predicted_value = le.inverse_transform([int(predicted_value)])[0]
+                                
+                                st.success(f"**Predicted `{target}`: {predicted_value}**")
+                            except Exception as e:
+                                st.error(f"Prediction error: {e}")
+                    
+                    prediction_fragment()
+                else:
+                    st.warning("Model or features not available for prediction.")
+                
+            with tab3:
+                st.header("AI Explanation")
+                st.markdown(result.get('explanation', "No explanation generated."))
+                
+            with tab4:
+                st.header("Processing Logs")
+                st.subheader("Data Cleaning Report")
+                st.text(result.get('cleaning_report', 'No report'))
+                
+                st.subheader("Feature Engineering Report")
+                st.text(result.get('feature_report', 'No report'))
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
