@@ -24,17 +24,17 @@ def clean_data(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
                 # Fill numerical with median
                 median_val = df[col].median()
                 df[col] = df[col].fillna(median_val)
-                report.append(f"Filled {missing_count} missing values in '{col}' with median ({median_val}).")
+                report.append(f"Filled {missing_count} missing values in `{col}` with median ({median_val}).")
             else:
                 # Fill categorical with mode
                 if not df[col].mode().empty:
                     mode_val = df[col].mode()[0]
                     df[col] = df[col].fillna(mode_val)
-                    report.append(f"Filled {missing_count} missing values in '{col}' with mode ('{mode_val}').")
+                    report.append(f"Filled {missing_count} missing values in `{col}` with mode ('{mode_val}').")
                 else:
                     # Fallback if mode is empty (all NaNs)
                     df[col] = df[col].fillna("Unknown")
-                    report.append(f"Filled {missing_count} missing values in '{col}' with 'Unknown'.")
+                    report.append(f"Filled {missing_count} missing values in `{col}` with 'Unknown'.")
 
     # 3. Encode categorical variables
     # We use Label Encoding for simplicity to ensure all data is numeric for models
@@ -46,7 +46,7 @@ def clean_data(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
         # strict conversion to string to avoid mixed type issues
         df[col] = df[col].astype(str)
         df[col] = le.fit_transform(df[col])
-        report.append(f"Encoded categorical column '{col}' using LabelEncoder.")
+        report.append(f"Encoded categorical column `{col}` using LabelEncoder.")
 
     if not report:
         report.append("No cleaning was necessary.")

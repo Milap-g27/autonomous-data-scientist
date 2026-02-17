@@ -5,17 +5,21 @@ from config import settings
 
 def understand_data_node(state: dict) -> dict:
     """
-    Analyzes the dataframe to determine the problem type (Regression vs Classification).
+    Analyzes the dataframe to determine the problem type (Regression, Classification, or Clustering).
     """
+    df = state['df']
+    target = state.get('target')
+    
+    # If no target is specified, it's a clustering problem
+    if target is None:
+        return {"problem_type": "Clustering"}
+    
     # Initialize LLM here to ensure API key is captured from environment
     llm = ChatGroq(
         api_key=settings.GROQ_API_KEY,
         model_name="llama-3.3-70b-versatile", 
         temperature=0
     )
-
-    df = state['df']
-    target = state['target']
     
     # Create a summary of the data for the LLM
     # If the df is huge, we only take head and info-like details

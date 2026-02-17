@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 
-def perform_eda(df: pd.DataFrame, target: str) -> tuple[dict, list]:
+def perform_eda(df: pd.DataFrame, target: str = None) -> tuple[dict, list]:
     """
-    Performs EDA: Generates stats and creates visualizations (histograms, boxplots, scatter, heatmap).
+    Performs EDA: Generates stats and creates visualizations (histograms, boxplots, heatmap).
+    When target is None (clustering), skips target-specific plots.
     Returns a dict of summary stats and a list of {"figure": fig, "description": str}.
     """
     results = {}
@@ -64,17 +65,18 @@ def perform_eda(df: pd.DataFrame, target: str) -> tuple[dict, list]:
     # Set plot style
     sns.set_theme(style="whitegrid")
     
-    # 2. Target Distribution
-    fig1, ax1 = plt.subplots(figsize=(6, 4))
-    if pd.api.types.is_numeric_dtype(df[target]):
-        sns.histplot(df[target], kde=True, ax=ax1)
-        ax1.set_title(f"Distribution of Target: {target}")
-        desc1 = f"Histogram showing the distribution of the target variable '{target}'."
-    else:
-        sns.countplot(y=df[target], ax=ax1)
-        ax1.set_title(f"Count Plot of Target: {target}")
-        desc1 = f"Count plot showing the frequency of each class in the target variable '{target}'."
-    figures.append({"figure": fig1, "description": desc1, "heading": "Target Distribution"})
+    # 2. Target Distribution (skip for clustering)
+    if target is not None and target in df.columns:
+        fig1, ax1 = plt.subplots(figsize=(6, 4))
+        if pd.api.types.is_numeric_dtype(df[target]):
+            sns.histplot(df[target], kde=True, ax=ax1)
+            ax1.set_title(f"Distribution of Target: {target}")
+            desc1 = f"Histogram showing the distribution of the target variable '{target}'."
+        else:
+            sns.countplot(y=df[target], ax=ax1)
+            ax1.set_title(f"Count Plot of Target: {target}")
+            desc1 = f"Count plot showing the frequency of each class in the target variable '{target}'."
+        figures.append({"figure": fig1, "description": desc1, "heading": "Target Distribution"})
     
     # 3. Correlation Heatmap (numerical only)
     numeric_df = df_vis.select_dtypes(include=['number'])
@@ -85,13 +87,14 @@ def perform_eda(df: pd.DataFrame, target: str) -> tuple[dict, list]:
         ax2.set_title("Correlation Heatmap")
         figures.append({"figure": fig2, "description": "Heatmap displaying the correlation coefficients between numerical features.", "heading": "Correlation Heatmap"})
         
-        # Identify top correlated features with target
-        if target in corr.columns:
+        # Identify top correlated features with target (only for supervised)
+        if target is not None and target in corr.columns:
             target_corr = corr[target].abs().sort_values(ascending=False)
             top_features = target_corr[1:6].index.tolist()
             results['top_correlated_features'] = top_features
         else:
-            top_features = numeric_df.columns[:5].tolist()
+            # For clustering, just pick the most variable features
+            top_features = numeric_df.std().sort_values(ascending=False).head(5).index.tolist()
     else:
         top_features = []
         

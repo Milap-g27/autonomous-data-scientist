@@ -8,6 +8,8 @@ scikit-learn
 matplotlib
 seaborn
 xgboost
+lightgbm
+catboost
 python-dotenv
 tabulate
 pydantic-settings

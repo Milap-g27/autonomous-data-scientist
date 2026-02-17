@@ -1,13 +1,13 @@
-from typing import TypedDict, List, Dict, Any
+from typing import TypedDict, List, Dict, Any, Optional
 import pandas as pd
 import matplotlib.figure
 
 class AgentState(TypedDict):
     df: pd.DataFrame
-    problem_type: str  # 'Regression' or 'Classification'
-    target: str
+    problem_type: str  # 'Regression', 'Classification', or 'Clustering'
+    target: Optional[str]
     X: pd.DataFrame
-    y: pd.Series
+    y: Optional[pd.Series]
     metrics: Dict[str, Any]
     model_name: str
     eda_results: Dict[str, Any]

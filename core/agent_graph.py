@@ -1,4 +1,4 @@
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END , START
 from core.state import AgentState
 
 # Import nodes
@@ -20,36 +20,44 @@ def clean_data_node(state: AgentState) -> dict:
 
 def eda_node(state: AgentState) -> dict:
     df = state['df']
-    target = state['target']
+    target = state.get('target')
     metrics, figures = perform_eda(df, target)
     return {"eda_results": metrics, "eda_figures": figures}
 
 def feature_engineering_node(state: AgentState) -> dict:
     df = state['df']
-    target = state['target']
+    target = state.get('target')
     problem_type = state['problem_type']
     X, y, report = perform_feature_engineering(df, target, problem_type)
     return {"X": X, "y": y, "feature_report": report}
 
 def train_models_node(state: AgentState) -> dict:
     X = state['X']
-    y = state['y']
+    y = state.get('y')
     problem_type = state['problem_type']
+    
+    if problem_type == "Clustering":
+        # No train/test split for clustering — use all data
+        models = train_models(X, None, problem_type)
+        return {"models": models}
     
     # Split data here for training and evaluation
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     models = train_models(X_train, y_train, problem_type)
-    # Note: We are not storing X_test/y_test in state potentially due to size, 
-    # but re-splitting in evaluate_node with same seed guarantees same split.
     
     return {"models": models}
 
 def evaluate_models_node(state: AgentState) -> dict:
     X = state['X']
-    y = state['y']
+    y = state.get('y')
     models = state['models']
     problem_type = state['problem_type']
+    
+    if problem_type == "Clustering":
+        # Evaluate on full data, no y needed
+        metrics, best_model_name = evaluate_models(models, X, None, problem_type)
+        return {"metrics": metrics, "model_name": best_model_name}
     
     # Re-split to get the same test set
     _, X_test, _, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
