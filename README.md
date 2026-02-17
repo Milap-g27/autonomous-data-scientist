@@ -5,20 +5,26 @@ A production-grade AI agent that autonomously cleans data, performs EDA, enginee
 ## Features
 
 - **Auto-Cleaning**: Handles missing values (median/mode fill), duplicates, and categorical encoding (LabelEncoder). Reports each step with column names in backticks.
+  
 - **Advanced EDA**:
   - Summary statistics with missing values count, unique values count, and data types table.
   - Target distribution plot, correlation heatmap, and outlier detection boxplots — each with headings and descriptions.
   - Feature importance chart (tree-based `feature_importances_` & coefficient-based `coef_` models).
-  - Distribution plots for low-cardinality features (≤ 5 unique values), displayed individually.
+  - Distribution plots for low-cardinality features, displayed individually.
+    
 - **Comprehensive Modeling**:
   - **Regression** (14 models): Linear, Ridge, Lasso, ElasticNet, SVR, KNN, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP Neural Network, Voting Ensemble.
   - **Classification** (13 models): Logistic Regression, SVM, KNN, Naive Bayes, Decision Tree, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP Neural Network, Voting Ensemble.
   - **Clustering** (6 models): KMeans (auto-k via silhouette), Agglomerative, DBSCAN, MeanShift, Birch, Gaussian Mixture.
   - Hyperparameter tuning via `RandomizedSearchCV` with dynamic CV folds (safe for small classes).
   - Each model wrapped in `try/except` for robustness — a single model failure never crashes the pipeline.
+  
 - **Interactive Prediction** (Supervised): Fill in a form with original dataset column names and types (int/float/categorical with min/max ranges) — input is processed through the same cleaning & feature engineering pipeline, and the best model predicts the output with reverse-mapped labels.
+
 - **Cluster Visualization** (Clustering): Preview cluster assignments, cluster count, and cluster size distribution bar chart.
+  
 - **LLM Reasoning**: Uses Llama 3.3 70B via Groq to infer problem type (or auto-detect Clustering when no target) and explain results in plain English. Column names are wrapped in backticks for clarity.
+  
 - **Deterministic Workflow**: Built on LangGraph state machine with Streamlit `session_state` persistence and `@st.fragment` for isolated form reruns.
 
 ## Architecture
