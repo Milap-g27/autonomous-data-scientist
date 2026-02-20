@@ -1,109 +1,172 @@
 # Autonomous Data Scientist Agent 🤖
 
-A production-grade AI agent that autonomously cleans data, performs EDA, engineers features, trains models, and explains results using **LangGraph**, **Streamlit**, and **ChatGroq**. Supports **Regression**, **Classification**, and **Clustering** workflows.
+An end-to-end AI agent that takes a raw CSV file and autonomously cleans it, explores it, engineers features, trains and evaluates multiple ML models, and explains the results in plain English — all without writing a single line of code.
 
-## Features
+Built with **LangGraph** (agent orchestration), **Streamlit** (UI), **ChatGroq / Llama 3.3 70B** (LLM reasoning), and a full **scikit-learn / XGBoost / LightGBM / CatBoost** model suite. Supports **Regression**, **Classification**, and **Clustering** out of the box.
 
-- **Auto-Cleaning**: Handles missing values (median/mode fill), duplicates, and categorical encoding (LabelEncoder). Reports each step with column names in backticks.
-  
-- **Advanced EDA**:
-  - Summary statistics with missing values count, unique values count, and data types table.
-  - Target distribution plot, correlation heatmap, and outlier detection boxplots — each with headings and descriptions.
-  - Feature importance chart (tree-based `feature_importances_` & coefficient-based `coef_` models).
-  - Distribution plots for low-cardinality features, displayed individually.
-    
-- **Comprehensive Modeling**:
-  - **Regression** (14 models): Linear, Ridge, Lasso, ElasticNet, SVR, KNN, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP Neural Network, Voting Ensemble.
-  - **Classification** (13 models): Logistic Regression, SVM, KNN, Naive Bayes, Decision Tree, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP Neural Network, Voting Ensemble.
-  - **Clustering** (6 models): KMeans (auto-k via silhouette), Agglomerative, DBSCAN, MeanShift, Birch, Gaussian Mixture.
-  - Hyperparameter tuning via `RandomizedSearchCV` with dynamic CV folds (safe for small classes).
-  - Each model wrapped in `try/except` for robustness — a single model failure never crashes the pipeline.
-  
-- **Interactive Prediction** (Supervised): Fill in a form with original dataset column names and types (int/float/categorical with min/max ranges) — input is processed through the same cleaning & feature engineering pipeline, and the best model predicts the output with reverse-mapped labels.
+---
 
-- **Cluster Visualization** (Clustering): Preview cluster assignments, cluster count, and cluster size distribution bar chart.
-  
-- **LLM Reasoning**: Uses Llama 3.3 70B via Groq to infer problem type (or auto-detect Clustering when no target) and explain results in plain English. Column names are wrapped in backticks for clarity.
-  
-- **Deterministic Workflow**: Built on LangGraph state machine with Streamlit `session_state` persistence and `@st.fragment` for isolated form reruns.
 
-## Architecture
+## What It Does
 
-The agent follows a linear graph:
+You upload a CSV. The agent does everything else:
+
+1. **Understands** the data — an LLM reads column names, types, and a sample to infer whether the problem is regression, classification, or clustering.
+2. **Cleans** the data — fills missing values (median for numeric, mode for categorical), drops duplicates, encodes categoricals with LabelEncoder.
+3. **Explores** the data — computes summary statistics, counts missing values, plots distributions, correlation heatmaps, and boxplots for outlier detection.
+4. **Engineers features** — applies one-hot encoding, polynomial features, and interaction terms where appropriate.
+5. **Trains models** — runs a full suite of algorithms with `RandomizedSearchCV` hyperparameter tuning:
+   - **Regression (14 models):** Linear, Ridge, Lasso, ElasticNet, SVR, KNN, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP, Voting Ensemble
+   - **Classification (13 models):** Logistic Regression, SVM, KNN, Naive Bayes, Decision Tree, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, MLP, Voting Ensemble
+   - **Clustering (6 models):** KMeans (auto-k via silhouette), Agglomerative, DBSCAN, MeanShift, Birch, Gaussian Mixture
+6. **Evaluates** models — picks the best by R² (regression), F1 (classification), or Silhouette Score (clustering).
+7. **Explains** — the LLM writes a plain-English report covering model performance, key metrics, and data insights.
+
+---
+
+## Agent Flow
 
 ```
-Understand Data → Clean Data → EDA → Feature Engineering → Train Models → Evaluate Models → Explain Results
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         LangGraph State Machine                             │
+│                                                                             │
+│  Understand Data  →  Clean Data  →  EDA  →  Feature Engineering            │
+│                                                                             │
+│  → Train Models  →  Evaluate Models  →  Explain Results  →  [ END ]        │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Supervised** (Regression/Classification): LLM detects problem type → full pipeline with train/test split → metrics (R², MSE, MAE for regression; Accuracy, Precision, Recall, F1 for classification).
-- **Clustering**: Auto-detected when target is "None" → no train/test split → models fitted on full data → evaluated with Silhouette Score, Calinski-Harabasz, and Davies-Bouldin indices.
+Each step is a **LangGraph node** that reads from and writes to a shared `AgentState` TypedDict. The graph is compiled once and invoked per run — results are persisted in Streamlit `session_state` so the UI never re-runs the pipeline on rerender.
 
-## Tabs
+**Supervised path (Regression / Classification):**
+- LLM detects problem type from data context
+- Train/test split (configurable, default 80/20)
+- Models trained on train set, evaluated on held-out test set
+- Best model selected and exposed for live prediction
 
-| Tab | Contents |
-|-----|----------|
-| **📊 EDA & Insights** | Summary stats, missing/unique counts table, target distribution, correlation heatmap, boxplots, feature importance, categorical distributions |
-| **🏆 Model Performance** | Metrics table for all models, best model highlight, interactive prediction form (supervised) or cluster assignment preview + size chart (clustering) |
-| **📝 AI Explanation** | LLM-generated plain-English explanation with backtick-wrapped column names |
-| **⚙️ Processing Log** | Data cleaning report and feature engineering report displayed as bullet-point lists with backtick column names, plus agent pipeline graph |
+**Clustering path:**
+- Auto-triggered when no target column is selected
+- No train/test split — all data used for fitting
+- Evaluated with Silhouette Score, Calinski-Harabasz, and Davies-Bouldin indices
+- Best cluster assignment previewed in the UI
+
+---
+
+## UI Overview
+
+The results dashboard is split into **6 tabs**:
+
+| Tab | What You'll Find |
+|-----|-----------------|
+| **📊 EDA & Insights** | Summary statistics table (rows = columns, cols = stats), missing values & unique counts table with data types |
+| **📈 Plots & Visualizations** | Target distribution, correlation heatmap, outlier boxplots, feature importance chart, low-cardinality distribution plots |
+| **🏆 Model Performance** | Plotly bar chart comparing all trained models, full metrics table, best model highlighted |
+| **🔮 Predictions** | Centered vertical form pre-filled with median values — submit to get a live prediction from the best model with a styled result card |
+| **📝 AI Explanation** | LLM-generated narrative covering model choice, metric interpretation, and data insights |
+| **⚙️ Processing Log** | Step-by-step data cleaning and feature engineering reports, plus the LangGraph agent pipeline diagram |
+
+A **floating AI chatbot** (💬 button) is available on every page — it is scoped to the current session and can answer questions about the dataset, models, metrics, and explanations.
+
+---
 
 ## Setup
 
-1. **Clone the repository**
-2. **Create a virtual environment** (recommended):
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate   # Windows
-   source .venv/bin/activate # Linux/Mac
-   ```
-3. **Install dependencies**:
-   ```cmd
-   pip install -r requirements.txt
-   ```
-4. **Get Groq API Key**:
-   - Sign up at [console.groq.com](https://console.groq.com) to get a free API key.
-   - Create a `.env` file in the project root:
-     ```
-     GROQ_API_KEY=your_api_key_here
-     ```
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/autonomous-data-scientist.git
+cd autonomous-data-scientist
+```
+
+### 2. Create a virtual environment
+
+```bash
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Add your Groq API key
+
+Sign up for a free key at [console.groq.com](https://console.groq.com), then create a `.env` file in the project root:
+
+```
+GROQ_API_KEY=your_api_key_here
+```
+
+---
 
 ## Usage
 
-1. **Run the Streamlit App**:
-   ```bash
-   streamlit run main.py
-   ```
-   Or explicitly with the venv Python:
-   ```bash
-   .venv\Scripts\python.exe -m streamlit run main.py
-   ```
-2. **Upload a CSV file** (e.g., Titanic, Iris, Housing prices, Personality dataset).
-3. **Select the target column** you want to predict, or choose **"None (Clustering)"** for unsupervised clustering.
-4. **Click "🚀 Run AI Data Scientist"** and wait for the analysis to complete.
-5. **Explore results** across the four tabs.
-6. **Make predictions** (supervised) — fill in feature values in the Model Performance tab and click "🔮 Predict".
+```bash
+streamlit run main.py
+```
+
+Then in the browser:
+
+1. **Upload** a CSV dataset (Titanic, Iris, Housing prices, or any tabular dataset).
+2. **Select a target column** to predict — or choose **"None (Clustering)"** for unsupervised analysis.
+3. **Configure** problem type (or leave on Auto-detect), test split size, random seed, and feature scaling in Advanced Settings.
+4. **Click 🚀 Run AI Data Scientist** and wait ~30–60 seconds.
+5. **Explore** all six result tabs.
+6. **Predict** — go to the Predictions tab, adjust feature values, and click 🔮 Predict to get an instant inference from the best model.
+7. **Ask questions** — use the 💬 chatbot to query anything about the analysis.
+
+---
 
 ## Project Structure
 
 ```
-├── main.py                          # Streamlit frontend (tabs, prediction form, cluster viz)
-├── config.py                        # App settings (API keys via pydantic-settings)
-├── .env                             # Environment variables (GROQ_API_KEY)
-├── requirements.txt                 # Python dependencies
-├── run.bat                          # One-click launcher (Windows)
+autonomous-data-scientist/
+│
+├── main.py                     # App entry point — layout, page config, section orchestration
+├── config.py                   # Pydantic-settings config (loads GROQ_API_KEY from .env)
+├── requirements.txt            # All Python dependencies
+├── .env                        # Your API keys (not committed to git)
+│
 ├── core/
-│   ├── agent_graph.py               # LangGraph workflow definition (clustering-aware)
-│   └── state.py                     # Agent state (TypedDict, optional target/y)
+│   ├── agent_graph.py          # LangGraph graph definition — nodes wired into a linear pipeline
+│   └── state.py                # AgentState TypedDict — shared state passed between all nodes
+│
 ├── llm/
-│   ├── understand_data.py           # LLM node: infer problem type (or auto-Clustering)
-│   └── explain_results.py           # LLM node: explain results (supervised & clustering prompts)
+│   ├── understand_data.py      # LLM node: infer problem type from column names + sample data
+│   └── explain_results.py      # LLM node: generate plain-English explanation of results
+│
 ├── pipeline/
-│   ├── data_cleaning.py             # Cleaning: missing values, duplicates, encoding
-│   ├── eda.py                       # EDA: stats, plots, correlations (target-optional)
-│   ├── feature_engineering.py       # Feature engineering: OHE, interactions, polynomials
-│   ├── model_training.py            # 14 regression / 13 classification / 6 clustering models
-│   └── model_evaluation.py          # Evaluation: R²/F1 (supervised), silhouette (clustering)
+│   ├── data_cleaning.py        # Missing value imputation, deduplication, label encoding
+│   ├── eda.py                  # Summary stats, distribution plots, heatmaps, boxplots
+│   ├── feature_engineering.py  # OHE, polynomial features, interaction terms
+│   ├── model_training.py       # 14 regression / 13 classification / 6 clustering models
+│   └── model_evaluation.py     # Metric computation and best-model selection
+│
+└── ui/
+    ├── components.py           # All dashboard rendering functions (tabs, charts, forms)
+    ├── chatbot.py              # Floating chatbot — session-scoped LLM assistant
+    └── styles.py               # Global CSS injection and scroll helpers
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| UI | Streamlit |
+| Agent Orchestration | LangGraph |
+| LLM | Llama 3.3 70B via ChatGroq |
+| ML Models | scikit-learn, XGBoost, LightGBM, CatBoost |
+| Visualizations | Matplotlib, Seaborn, Plotly |
+| Config | pydantic-settings + python-dotenv |
 
 ## Models
 

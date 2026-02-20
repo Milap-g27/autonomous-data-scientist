@@ -30,3 +30,5 @@ Thumbs.db
 # Project specific
 *.log
 .pytest_cache/
+catboost_info/
+.venv_old_*/
