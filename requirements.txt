@@ -1,7 +1,11 @@
 langgraph
 langchain
 langchain_groq
+fastapi
+uvicorn[standard]
+python-multipart
 streamlit
+requests
 pandas
 numpy
 scikit-learn

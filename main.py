@@ -1,12 +1,18 @@
 """
-Autonomous Data Scientist Agent — Streamlit app entry point.
+Autonomous Data Scientist Agent — FastAPI entry point.
 
-Architecture:
-  1. Upload    → render_upload_section()
-  2. Config    → render_config_section()
-  3. Run       → render_run_button()
-  4. Dashboard → render_dashboard()
-  5. Chatbot   → render_chatbot()  (sidebar)
+All endpoints are fully asynchronous:
+  POST /api/upload      Upload a CSV dataset
+  POST /api/configure   Set analysis configuration
+  POST /api/analyze     Run the full async ML pipeline
+  POST /api/predict     Predict with the trained best model
+  POST /api/chat        Chat with AI assistant
+  GET  /api/sessions    List active session IDs
+  DELETE /api/sessions/{id}  Delete a session
+  GET  /api/health      Health check
+
+Run:
+  uvicorn main:app --reload
 """
 
 import warnings
@@ -14,54 +20,42 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_core")
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-import streamlit as st
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend before any other mpl import
 
-# ── Page config (must be first Streamlit call) ──
-st.set_page_config(
-    layout="wide",
-    page_title="Autonomous Data Scientist Agent",
-    page_icon="🤖",
-    initial_sidebar_state="collapsed",
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from config import settings
+from api.routes import router
+
+app = FastAPI(
+    title="Autonomous Data Scientist Agent",
+    description=(
+        "Upload a dataset — the agent asynchronously cleans, explores, "
+        "models, and explains automatically via a REST API."
+    ),
+    version="2.0.0",
 )
 
-# ── UI modules ──
-from ui.styles import inject_global_css, scroll_to_dashboard
-from ui.components import (
-    render_header,
-    render_upload_section,
-    render_config_section,
-    render_run_button,
-    render_dashboard,
+# ── CORS ──
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-from ui.chatbot import render_chatbot
 
-
-def main():
-    """Top-level app layout."""
-    # 1 — Inject CSS
-    inject_global_css()
-
-    # 2 — Gradient Header
-    render_header()
-
-    # 3 — Upload
-    df = render_upload_section()
-
-    if df is not None:
-        # 4 — Config
-        config = render_config_section(df)
-
-        # 5 — Run
-        render_run_button(df, config)
-
-        # 6 — Dashboard (only when analysis is done)
-        if st.session_state.get("analysis_done", False):
-            render_dashboard()
-            scroll_to_dashboard()
-
-    # 7 — Floating AI Assistant (sidebar chatbot — always available)
-    render_chatbot()
+# ── Routes ──
+app.include_router(router, prefix="/api")
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(
+        "main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=True,
+    )

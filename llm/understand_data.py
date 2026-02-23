@@ -3,9 +3,10 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from config import settings
 
-def understand_data_node(state: dict) -> dict:
+async def understand_data_node(state: dict) -> dict:
     """
-    Analyzes the dataframe to determine the problem type (Regression, Classification, or Clustering).
+    Asynchronously analyzes the dataframe to determine the problem type
+    (Regression, Classification, or Clustering).
     """
     df = state['df']
     target = state.get('target')
@@ -22,7 +23,6 @@ def understand_data_node(state: dict) -> dict:
     )
     
     # Create a summary of the data for the LLM
-    # If the df is huge, we only take head and info-like details
     data_head = df.head().to_markdown()
     target_info = df[target].describe().to_markdown() if target in df.columns else "Target not found in DF"
     
@@ -34,7 +34,7 @@ def understand_data_node(state: dict) -> dict:
     chain = prompt | llm
     
     try:
-        response = chain.invoke({
+        response = await chain.ainvoke({
             "data_head": data_head,
             "target_info": target_info,
             "target": target

@@ -1,77 +1,21 @@
 """
-Floating AI Chatbot — session-aware assistant restricted to dataset/model topics.
-Uses ChatGroq (Llama 3.3 70b) for responses, scoped to session context only.
+Floating AI Chatbot — session-aware assistant that talks to the FastAPI backend.
+All LLM calls happen server-side via POST /api/chat.
 """
+import os
 import streamlit as st
-from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from config import settings
+import requests
 
-
-_REJECTION = "I can only answer questions related to the current dataset and model analysis."
-
-_SYSTEM_TEMPLATE = """You are an expert data science assistant embedded in the Autonomous Data Scientist application.
-You answer questions ONLY about:
-- The uploaded dataset (columns, types, distributions)
-- Feature engineering and data cleaning steps performed
-- Model performance and evaluation metrics
-- The AI explanation generated for this analysis
-- General machine learning theory and best practices
-
-If the user asks anything unrelated (e.g., weather, politics, coding help outside ML), respond EXACTLY with:
-"{rejection}"
-
-Here is the current session context:
-
-### Dataset Summary
-{dataset_summary}
-
-### Model Configuration
-{model_config}
-
-### Model Results
-{model_results}
-
-### AI Explanation
-{ai_explanation}
-
-### Data Cleaning Report (Processing Log)
-{cleaning_report}
-
-### Feature Engineering Report (Processing Log)
-{feature_report}
-"""
-
-
-def _get_system_prompt() -> str:
-    """Build system prompt from session state context."""
-    dataset_summary = st.session_state.get("dataset_summary", "No dataset uploaded yet.")
-    model_config = str(st.session_state.get("model_config", "Not configured yet."))
-    model_results = str(st.session_state.get("model_results", "No results yet."))
-    ai_explanation = st.session_state.get("ai_explanation", "No explanation generated yet.")
-    cleaning_report = st.session_state.get("cleaning_report", "No cleaning report yet.")
-    feature_report = st.session_state.get("feature_report", "No feature engineering report yet.")
-
-    return _SYSTEM_TEMPLATE.format(
-        rejection=_REJECTION,
-        dataset_summary=dataset_summary,
-        model_config=model_config,
-        model_results=model_results,
-        ai_explanation=ai_explanation,
-        cleaning_report=cleaning_report,
-        feature_report=feature_report,
-    )
+API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api")
 
 
 def render_chatbot():
     """Render the floating chatbot FAB and modal."""
-    # Chatbot toggle button (CSS-styled as a floating action button)
     if "chat_open" not in st.session_state:
         st.session_state["chat_open"] = False
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = []
 
-    # Toggle visibility
     _render_chat_toggle()
 
     if st.session_state["chat_open"]:
@@ -113,37 +57,23 @@ def _render_chat_modal():
 
 
 def _get_chat_response(user_message: str) -> str:
-    """Call ChatGroq with session context to answer the user's question."""
-    api_key = settings.GROQ_API_KEY
-    if not api_key:
-        return "⚠️ GROQ_API_KEY not configured. Please set it in your `.env` file."
+    """Call POST /api/chat on the FastAPI backend."""
+    session_id = st.session_state.get("session_id")
+    if not session_id:
+        return "⚠️ No active session. Please upload a dataset first."
 
     try:
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            api_key=api_key,  # type: ignore[arg-type]
-            temperature=0.3,
-            max_tokens=1024,
+        resp = requests.post(
+            f"{API_BASE}/chat",
+            json={"session_id": session_id, "message": user_message},
+            timeout=60,
         )
-
-        # Build messages
-        messages: list[SystemMessage | HumanMessage | AIMessage] = [
-            SystemMessage(content=_get_system_prompt()),
-        ]
-
-        # Include recent history for context (last 6 exchanges max)
-        recent_history = st.session_state["chat_history"][-12:]
-        for msg in recent_history:
-            if msg["role"] == "user":
-                messages.append(HumanMessage(content=msg["content"]))
-            else:
-                messages.append(AIMessage(content=msg["content"]))
-
-        # Add the current message
-        messages.append(HumanMessage(content=user_message))
-
-        response = llm.invoke(messages)
-        return str(response.content)
-
+        if resp.status_code == 200:
+            return resp.json().get("reply", "No reply received.")
+        else:
+            detail = resp.json().get("detail", resp.text)
+            return f"⚠️ Error: {detail}"
+    except requests.exceptions.ConnectionError:
+        return "⚠️ Cannot reach the API server. Make sure `uvicorn main:app` is running on port 8000."
     except Exception as e:
         return f"⚠️ Error: {e}"

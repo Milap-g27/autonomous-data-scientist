@@ -3,9 +3,9 @@ from langchain_core.prompts import ChatPromptTemplate
 import pandas as pd
 from config import settings
 
-def explain_results_node(state: dict) -> dict:
+async def explain_results_node(state: dict) -> dict:
     """
-    Generates a natural language explanation of the results using the LLM.
+    Asynchronously generates a natural language explanation of the results using the LLM.
     """
     # Initialize LLM here to ensure API key is captured from environment
     llm = ChatGroq(
@@ -78,7 +78,7 @@ def explain_results_node(state: dict) -> dict:
     chain = prompt | llm
     
     try:
-        response = chain.invoke({
+        response = await chain.ainvoke({
             "problem_type": problem_type,
             "target": target or "N/A",
             "best_model": best_model,

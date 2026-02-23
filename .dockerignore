@@ -1,0 +1,12 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+.vscode
+.env
+data
+artifacts
+notebooks
+tests
+*.md
