@@ -251,11 +251,11 @@ async def chat(req: ChatRequest):
     if not api_key:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured.")
 
-    reply = await _get_chat_response(session, req.message)
+    reply = await _get_chat_response(session, req.message, api_key)
     return ChatResponse(reply=reply)
 
 
-async def _get_chat_response(session: Session, user_message: str) -> str:
+async def _get_chat_response(session: Session, user_message: str, api_key: str) -> str:
     """Call ChatGroq asynchronously with session context."""
     from langchain_groq import ChatGroq
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
