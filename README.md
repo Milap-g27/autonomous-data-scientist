@@ -106,10 +106,14 @@ GROQ_API_KEY=your_api_key_here
 
 ---
 
-## Usage
+## Usage (Local)
 
 ```bash
-streamlit run main.py
+# Terminal 1 — Start the FastAPI backend
+uvicorn main:app --reload
+
+# Terminal 2 — Start the Streamlit frontend
+streamlit run streamlit_app.py
 ```
 
 Then in the browser:
@@ -124,14 +128,59 @@ Then in the browser:
 
 ---
 
+## Deployment
+
+The app is deployed as **two services**:
+
+| Service | Platform | What it runs |
+|---------|----------|--------------|
+| **Backend API** | [Render](https://render.com) (Docker) | FastAPI + ML pipeline (`main:app`) |
+| **Frontend UI** | [Streamlit Cloud](https://share.streamlit.io) | Streamlit app (`streamlit_app.py`) |
+
+### Deploy the Backend on Render
+
+1. Push your repo to GitHub.
+2. Go to [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**.
+3. Connect your GitHub repo — Render auto-detects `render.yaml` and creates the service.
+4. Set environment variables in the Render dashboard:
+   - `GROQ_API_KEY` — your Groq API key
+   - `CORS_ORIGINS` — your Streamlit Cloud URL (e.g. `https://your-app.streamlit.app`)
+5. Deploy. Your API will be live at `https://<service-name>.onrender.com`.
+6. Test: visit `https://<service-name>.onrender.com/api/health`.
+
+### Deploy the Frontend on Streamlit Cloud
+
+1. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+2. Click **New app** → select your repo, branch `main`, and file `streamlit_app.py`.
+3. Under **Advanced settings → Secrets**, add:
+   ```
+   API_BASE_URL = "https://<your-render-service>.onrender.com/api"
+   ```
+4. Click **Deploy**. Your UI will be live at `https://your-app.streamlit.app`.
+5. Go back to Render and set `CORS_ORIGINS` to your Streamlit Cloud URL.
+
+### Environment Variables Summary
+
+| Variable | Where | Value |
+|----------|-------|-------|
+| `GROQ_API_KEY` | Render (backend) | Your Groq API key |
+| `CORS_ORIGINS` | Render (backend) | `https://your-app.streamlit.app` |
+| `API_BASE_URL` | Streamlit Cloud (frontend) | `https://<render-service>.onrender.com/api` |
+
+---
+
 ## Project Structure
 
 ```
 autonomous-data-scientist/
 │
-├── main.py                     # App entry point — layout, page config, section orchestration
+├── main.py                     # FastAPI entry point — all API endpoints
+├── streamlit_app.py            # Streamlit UI entry point
 ├── config.py                   # Pydantic-settings config (loads GROQ_API_KEY from .env)
 ├── requirements.txt            # All Python dependencies
+├── Dockerfile                  # Docker image for Render backend deployment
+├── render.yaml                 # Render Blueprint — auto-creates the backend service
+├── .dockerignore               # Files excluded from Docker build
 ├── .env                        # Your API keys (not committed to git)
 │
 ├── core/
@@ -148,6 +197,12 @@ autonomous-data-scientist/
 │   ├── feature_engineering.py  # OHE, polynomial features, interaction terms
 │   ├── model_training.py       # 14 regression / 13 classification / 6 clustering models
 │   └── model_evaluation.py     # Metric computation and best-model selection
+│
+├── api/
+│   ├── routes.py               # FastAPI route handlers (upload, configure, analyze, predict, chat)
+│   ├── schemas.py              # Pydantic request/response models
+│   ├── session.py              # In-memory session management
+│   └── utils.py                # Helper utilities for API layer
 │
 └── ui/
     ├── components.py           # All dashboard rendering functions (tabs, charts, forms)
