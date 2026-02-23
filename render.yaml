@@ -1,9 +1,10 @@
 services:
   - type: web
     name: autonomous-ds-api
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    env: python
     plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
@@ -11,5 +12,7 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: PYTHONUNBUFFERED
         value: "1"
