@@ -3,7 +3,7 @@ services:
     name: autonomous-ds-api
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
     autoDeploy: true
     healthCheckPath: /api/health
     envVars:
