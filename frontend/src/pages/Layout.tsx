@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Terminal, Home, Settings2, BarChart2, Bot } from 'lucide-react';
+import { Home, Settings2, BarChart2, Bot } from 'lucide-react';
 import { useState } from 'react';
 import ChatPanel from '../features/chat/components/ChatPanel';
 
@@ -23,7 +23,7 @@ export default function Layout({ sessionId, hasResults }: Props) {
       {/* Top Nav */}
       <header className="fixed top-0 w-full z-[60] flex items-center px-6 h-16 bg-black/80 backdrop-blur-md border-b border-white/10">
         <div className="flex items-center gap-3 mr-8">
-          <Terminal className="text-neutral-200 w-6 h-6" />
+          <img src="/logo.svg" alt="Logo" className="w-6 h-6" />
           <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400">
             Autonomous Data Scientist
           </h1>
@@ -37,11 +37,10 @@ export default function Layout({ sessionId, hasResults }: Props) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-neutral-800 text-neutral-200'
-                    : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all ${isActive
+                  ? 'bg-neutral-800 text-neutral-200'
+                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900'
+                  }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {item.label}
@@ -54,10 +53,9 @@ export default function Layout({ sessionId, hasResults }: Props) {
 
         {/* Status Chip */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-900/50 border border-white/5 rounded-full">
-          <span className={`w-2 h-2 rounded-full ${
-            !sessionId ? 'bg-neutral-500' :
+          <span className={`w-2 h-2 rounded-full ${!sessionId ? 'bg-neutral-500' :
             hasResults ? 'bg-green-400' : 'bg-amber-400 animate-pulse'
-          }`}></span>
+            }`}></span>
           <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider">
             {!sessionId ? 'IDLE' : hasResults ? 'COMPLETE' : 'ACTIVE'}
           </span>

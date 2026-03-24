@@ -59,9 +59,8 @@ export default function HomePage({ onSessionCreated }: Props) {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => document.getElementById('file-input')?.click()}
-          className={`w-full border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all ${
-            dragOver ? 'border-white/50 bg-neutral-900' : 'border-neutral-700/50 bg-neutral-950/50 hover:bg-neutral-900/50 hover:border-neutral-600'
-          }`}
+          className={`w-full border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all ${dragOver ? 'border-white/50 bg-neutral-900' : 'border-neutral-700/50 bg-neutral-950/50 hover:bg-neutral-900/50 hover:border-neutral-600'
+            }`}
         >
           <div className="w-16 h-16 rounded-full bg-neutral-800/50 flex items-center justify-center mb-4">
             <Upload className={`w-8 h-8 text-neutral-300 ${uploading ? 'animate-pulse' : ''}`} />

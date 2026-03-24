@@ -1,308 +1,349 @@
 <!DOCTYPE html>
 
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>PRECISION_OBSERVER_v1.0 | Autonomous Data Scientist</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Outfit:wght@100;300;400;600&amp;family=Manrope:wght@300;400;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "outline-variant": "#3c494d",
-              "on-surface": "#dae2fd",
-              "tertiary-fixed": "#6ffbbe",
-              "surface-tint": "#23d8ff",
-              "surface": "#0b1326",
-              "surface-container-highest": "#2d3449",
-              "tertiary-container": "#4ddda2",
-              "tertiary-fixed-dim": "#4edea3",
-              "on-primary-fixed-variant": "#004e5e",
-              "surface-container": "#171f33",
-              "on-tertiary-container": "#005e3f",
-              "on-secondary": "#233144",
-              "secondary": "#b9c7e0",
-              "tertiary": "#6dfabc",
-              "surface-dim": "#0b1326",
-              "surface-bright": "#31394d",
-              "on-secondary-container": "#abb9d2",
-              "on-error-container": "#ffdad6",
-              "on-error": "#690005",
-              "on-primary-fixed": "#001f27",
-              "on-surface-variant": "#bbc9ce",
-              "secondary-fixed-dim": "#b9c7e0",
-              "inverse-surface": "#dae2fd",
-              "on-background": "#dae2fd",
-              "background": "#0b1326",
-              "surface-container-lowest": "#060e20",
-              "secondary-fixed": "#d5e3fd",
-              "inverse-primary": "#00677c",
-              "secondary-container": "#3c4a5e",
-              "surface-container-high": "#222a3d",
-              "outline": "#859398",
-              "primary-container": "#00d7ff",
-              "on-tertiary-fixed": "#002113",
-              "error-container": "#93000a",
-              "surface-variant": "#2d3449",
-              "on-secondary-fixed": "#0d1c2f",
-              "on-primary-container": "#005a6c",
-              "primary-fixed-dim": "#23d8ff",
-              "on-tertiary": "#003824",
-              "on-primary": "#003641",
-              "error": "#ffb4ab",
-              "surface-container-low": "#131b2e",
-              "primary-fixed": "#b0ecff",
-              "primary": "#acebff",
-              "on-tertiary-fixed-variant": "#005236",
-              "on-secondary-fixed-variant": "#3a485c",
-              "inverse-on-surface": "#283044"
-            },
-            fontFamily: {
-              "headline": ["Space Grotesk"],
-              "body": ["Manrope"],
-              "label": ["Manrope"]
-            },
-            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+<html class="dark" lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PRECISION_OBSERVER_v1.0 | Autonomous Data Scientist</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Outfit:wght@100;300;400;600&amp;family=Manrope:wght@300;400;600&amp;display=swap"
+    rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "outline-variant": "#3c494d",
+            "on-surface": "#dae2fd",
+            "tertiary-fixed": "#6ffbbe",
+            "surface-tint": "#23d8ff",
+            "surface": "#0b1326",
+            "surface-container-highest": "#2d3449",
+            "tertiary-container": "#4ddda2",
+            "tertiary-fixed-dim": "#4edea3",
+            "on-primary-fixed-variant": "#004e5e",
+            "surface-container": "#171f33",
+            "on-tertiary-container": "#005e3f",
+            "on-secondary": "#233144",
+            "secondary": "#b9c7e0",
+            "tertiary": "#6dfabc",
+            "surface-dim": "#0b1326",
+            "surface-bright": "#31394d",
+            "on-secondary-container": "#abb9d2",
+            "on-error-container": "#ffdad6",
+            "on-error": "#690005",
+            "on-primary-fixed": "#001f27",
+            "on-surface-variant": "#bbc9ce",
+            "secondary-fixed-dim": "#b9c7e0",
+            "inverse-surface": "#dae2fd",
+            "on-background": "#dae2fd",
+            "background": "#0b1326",
+            "surface-container-lowest": "#060e20",
+            "secondary-fixed": "#d5e3fd",
+            "inverse-primary": "#00677c",
+            "secondary-container": "#3c4a5e",
+            "surface-container-high": "#222a3d",
+            "outline": "#859398",
+            "primary-container": "#00d7ff",
+            "on-tertiary-fixed": "#002113",
+            "error-container": "#93000a",
+            "surface-variant": "#2d3449",
+            "on-secondary-fixed": "#0d1c2f",
+            "on-primary-container": "#005a6c",
+            "primary-fixed-dim": "#23d8ff",
+            "on-tertiary": "#003824",
+            "on-primary": "#003641",
+            "error": "#ffb4ab",
+            "surface-container-low": "#131b2e",
+            "primary-fixed": "#b0ecff",
+            "primary": "#acebff",
+            "on-tertiary-fixed-variant": "#005236",
+            "on-secondary-fixed-variant": "#3a485c",
+            "inverse-on-surface": "#283044"
           },
+          fontFamily: {
+            "headline": ["Space Grotesk"],
+            "body": ["Manrope"],
+            "label": ["Manrope"]
+          },
+          borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
         },
-      }
-    </script>
-<style>
-        body {
-            background-color: oklch(15% 0.03 240);
-            color: oklch(95% 0.01 240);
-            font-family: 'Manrope', sans-serif;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
-        }
-        .glass-panel {
-            background: oklch(100% 0 0 / 5%);
-            backdrop-filter: blur(12px);
-            border: 1px solid oklch(100% 0 0 / 15%);
-        }
-        .spotlight {
-            background: radial-gradient(circle at 70% 50%, oklch(85% 0.22 200 / 0.15) 0%, transparent 60%);
-        }
-    </style>
-<style>
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: oklch(15% 0.03 240);
+      color: oklch(95% 0.01 240);
+      font-family: 'Manrope', sans-serif;
+    }
+
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+    }
+
+    .glass-panel {
+      background: oklch(100% 0 0 / 5%);
+      backdrop-filter: blur(12px);
+      border: 1px solid oklch(100% 0 0 / 15%);
+    }
+
+    .spotlight {
+      background: radial-gradient(circle at 70% 50%, oklch(85% 0.22 200 / 0.15) 0%, transparent 60%);
+    }
+  </style>
+  <style>
     body {
       min-height: max(884px, 100dvh);
     }
   </style>
-  </head>
+</head>
+
 <body class="overflow-x-hidden">
-<!-- TopAppBar Shell -->
-<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0a0c10] dark:bg-slate-950">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-cyan-400">terminal</span>
-<h1 class="text-xl font-bold tracking-tighter text-cyan-400 uppercase font-['Space_Grotesk']">PRECISION_OBSERVER_v1.0</h1>
-</div>
-<div class="hidden md:flex gap-8">
-<nav class="flex gap-6 text-sm">
-<a class="text-cyan-400 border-b-2 border-cyan-400 pb-1 font-['Space_Grotesk'] font-bold tracking-tight" href="#">EDA</a>
-<a class="text-slate-400 font-light font-['Space_Grotesk'] hover:text-cyan-200 transition-colors" href="#">Visualizations</a>
-<a class="text-slate-400 font-light font-['Space_Grotesk'] hover:text-cyan-200 transition-colors" href="#">Model Performance</a>
-</nav>
-</div>
-<div class="flex items-center gap-4">
-<div class="w-10 h-10 rounded-full border border-cyan-400/30 p-0.5 overflow-hidden">
-<img alt="Scientist Profile" class="w-full h-full object-cover rounded-full grayscale hover:grayscale-0 transition-all" data-alt="Portrait of a data scientist in high contrast" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe06XV7tq9KWqpGa8qmsoEJrJ1dWQR9fn0Tb9k1BkMyIBUYxw700zCTvTtHlJ_zuCE2Hf__QRfwM-FpEWKKPhHJLglDNaiftXlUQLMO74llxvQthO6TmOlkFMYHwOJIuf8mF8_KNVS6aUY2WJJ-VOq0YFXdNF-gnKgi1yR3BPWpPQ_8p4hMEHgmuqM_KTUgr8FM7YkIJGlS1CSLGQ0yviz6_nBkcOzIKopswHm6p9uYNkqG5OMojvdC5IPvp8ZY_0Z1Rd0qUHlvoab"/>
-</div>
-</div>
-</header>
-<!-- NavigationDrawer Shell (Desktop Only) -->
-<aside class="fixed left-0 top-0 h-full z-40 flex flex-col pt-20 bg-[#12141a] dark:bg-slate-900 w-64 hidden md:flex shadow-2xl shadow-cyan-900/10">
-<div class="px-6 mb-8">
-<p class="text-cyan-400 font-bold font-['Outfit'] font-light text-sm uppercase tracking-widest">AGENT_CORE</p>
-</div>
-<nav class="flex flex-col gap-1">
-<a class="bg-cyan-500/10 text-cyan-400 border-r-4 border-cyan-400 px-4 py-3 flex items-center gap-3 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">analytics</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">EDA</span>
-</a>
-<a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">insights</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">Visualizations</span>
-</a>
-<a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">monitoring</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">Model Performance</span>
-</a>
-<a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">online_prediction</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">Predictions</span>
-</a>
-<a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">psychology</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">AI Explanation</span>
-</a>
-<a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out" href="#">
-<span class="material-symbols-outlined">terminal</span>
-<span class="font-['Outfit'] text-sm uppercase tracking-widest">Logs</span>
-</a>
-</nav>
-<div class="mt-auto p-6">
-<div class="p-4 bg-surface-container-low rounded-sm border-l-2 border-cyan-400">
-<p class="text-[10px] text-cyan-400 uppercase tracking-widest mb-1">Status</p>
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-<p class="text-xs font-mono text-on-surface">PROCESSING_STREAM_B</p>
-</div>
-</div>
-</div>
-</aside>
-<!-- Main Content Canvas -->
-<main class="md:ml-64 pt-16 pb-24 md:pb-8 px-6 min-h-screen bg-surface">
-<!-- Interactive 3D Hero Section -->
-<section class="mt-6 mb-12">
-<div class="relative w-full h-[450px] bg-slate-900 rounded-sm overflow-hidden spotlight flex items-center p-12 border border-white/5">
-<div class="w-full md:w-1/2 z-10">
-<div class="flex items-center gap-2 mb-4">
-<span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[10px] font-bold tracking-widest uppercase">Live Module</span>
-<div class="h-px w-12 bg-cyan-400/30"></div>
-</div>
-<h2 class="text-5xl font-['Space_Grotesk'] font-bold text-on-surface mb-4 leading-tight">Interactive 3D</h2>
-<p class="text-xl font-['Outfit'] font-light text-slate-400 mb-8 max-w-md">Bring your UI to life with autonomous spatial awareness and deep-learning visualization layers.</p>
-<button class="bg-primary-container text-on-primary-container px-8 py-3 rounded-sm font-['Space_Grotesk'] font-bold uppercase tracking-wider hover:shadow-[0_0_20px_rgba(0,215,255,0.3)] transition-all">
-                        Initialize Engine
-                    </button>
-</div>
-<!-- 3D Robot Embed Reference -->
-<div class="absolute right-0 top-0 w-full md:w-3/5 h-full opacity-80 md:opacity-100 pointer-events-none">
-<img alt="3D Robot Visualization" class="w-full h-full object-contain object-right" data-alt="Futuristic white 3D robot on a dark technical background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDm0iVeGh0GB8zKq7QGEQXMoWmTSUv9WRlCPjjk_N1N0VwowMWLEu1FfKbvnYdh9J134xH3UM9mZKg6K6J7l4KCtX11A99815IGhVbTCOD62rb1zuRSEQE_T5tHaq5PCCRhswlrtQMXCHUVZnEXyzl3eji2ZBFePB4fw1IJ6LYGKOnK_Ua3p6gc8-oguroeoUQJShOqFdD1NzyymJAlf99bsssOXrj2MmIX8Dr6SgTxjwwwlXxXvbmwOwxQxh0fATd-mHT63BMIOoC2"/>
-<!-- Technical overlays -->
-<div class="absolute inset-0 bg-gradient-to-l from-transparent via-slate-900/40 to-slate-900"></div>
-</div>
-</div>
-</section>
-<!-- Bento Grid Metrics Section -->
-<section class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-<!-- Metric 1 -->
-<div class="md:col-span-1 bg-surface-container-low p-6 rounded-sm relative overflow-hidden group">
-<p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] mb-2">Model Accuracy</p>
-<h3 class="text-4xl font-['Space_Grotesk'] font-bold text-cyan-400">98.42%</h3>
-<div class="mt-4 flex items-center gap-2 text-tertiary text-xs">
-<span class="material-symbols-outlined text-sm">trending_up</span>
-<span>+1.2% VS PREVIOUS_EPOCH</span>
-</div>
-<div class="absolute bottom-0 left-0 w-full h-1 bg-cyan-500/20"></div>
-<div class="absolute bottom-0 left-0 w-[98%] h-1 bg-cyan-400"></div>
-</div>
-<!-- Metric 2 -->
-<div class="md:col-span-1 bg-surface-container-low p-6 rounded-sm relative overflow-hidden">
-<p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] mb-2">AUC-ROC Score</p>
-<h3 class="text-4xl font-['Space_Grotesk'] font-bold text-on-surface">0.992</h3>
-<div class="mt-4 flex items-center gap-2 text-slate-500 text-xs uppercase tracking-widest">
-<span>Precision: 0.988</span>
-</div>
-</div>
-<!-- Metric 3: Log Stream -->
-<div class="md:col-span-2 bg-surface-container-low p-6 rounded-sm">
-<div class="flex justify-between items-center mb-4">
-<p class="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Processing Log</p>
-<span class="text-[10px] text-cyan-400 font-mono">STREAMING LIVE</span>
-</div>
-<div class="font-mono text-[11px] space-y-1.5 text-slate-400">
-<div class="flex gap-4">
-<span class="text-cyan-600">14:20:11</span>
-<span>[INFO] Correlation matrix computed for set_v4</span>
-</div>
-<div class="flex gap-4">
-<span class="text-cyan-600">14:20:13</span>
-<span>[WARN] Null variance detected in 'sensor_09'</span>
-</div>
-<div class="flex gap-4">
-<span class="text-cyan-600">14:20:15</span>
-<span class="text-on-surface">Processing deep-feature extraction...</span>
-</div>
-</div>
-</div>
-</section>
-<!-- Visualization Section (Asymmetric) -->
-<section class="grid grid-cols-1 md:grid-cols-12 gap-12 items-start mb-12">
-<!-- Left: Large Visualization -->
-<div class="md:col-span-8">
-<div class="mb-6">
-<h4 class="text-xl font-['Space_Grotesk'] font-bold uppercase tracking-tight mb-2">Variable Distribution</h4>
-<p class="text-sm text-slate-500 max-w-lg">Autonomous scan of feature density across the primary dataset dimension.</p>
-</div>
-<div class="w-full aspect-[21/9] glass-panel p-8 relative overflow-hidden flex items-end gap-1">
-<!-- Dummy Chart Representation -->
-<div class="flex-1 bg-cyan-400/20 h-1/4 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/30 h-1/3 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/40 h-1/2 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/50 h-2/3 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/60 h-3/4 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/80 h-[90%] rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/60 h-3/4 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/50 h-2/3 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/40 h-1/2 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/30 h-1/3 rounded-t-sm"></div>
-<div class="flex-1 bg-cyan-400/20 h-1/4 rounded-t-sm"></div>
-<!-- Axis Label -->
-<div class="absolute bottom-2 left-8 text-[9px] uppercase tracking-[0.3em] text-slate-600">Normalization Index: Sigma-4</div>
-</div>
-</div>
-<!-- Right: Secondary Visualization -->
-<div class="md:col-span-4 flex flex-col gap-8">
-<div>
-<h4 class="text-xl font-['Space_Grotesk'] font-bold uppercase tracking-tight mb-4">Correlation Matrix</h4>
-<div class="grid grid-cols-4 grid-rows-4 gap-1">
-<!-- Heatmap Mockup -->
-<div class="aspect-square bg-cyan-400/90"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/30"></div>
-<div class="aspect-square bg-cyan-400/10"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/90"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/30"></div>
-<div class="aspect-square bg-cyan-400/30"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/90"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/10"></div>
-<div class="aspect-square bg-cyan-400/30"></div>
-<div class="aspect-square bg-cyan-400/60"></div>
-<div class="aspect-square bg-cyan-400/90"></div>
-</div>
-</div>
-<div class="p-6 bg-surface-container-high rounded-sm">
-<h5 class="text-xs font-bold text-cyan-400 uppercase tracking-[0.2em] mb-3">Agent Reasoning</h5>
-<p class="text-sm text-slate-400 font-light leading-relaxed">High correlation detected between 'latency_idx' and 'energy_out'. Recommendation: apply PCA to reduce redundant dimensions.</p>
-</div>
-</div>
-</section>
-</main>
-<!-- BottomNavBar Shell (Mobile Only) -->
-<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 md:hidden bg-[#0a0c10]/80 backdrop-blur-xl border-t border-white/10 rounded-t-lg shadow-[0_-10px_30px_rgba(0,215,255,0.1)]">
-<a class="flex flex-col items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-lg p-2 active:scale-95 transition-all" href="#">
-<span class="material-symbols-outlined">smart_toy</span>
-</a>
-<a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
-<span class="material-symbols-outlined">query_stats</span>
-</a>
-<a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
-<span class="material-symbols-outlined">precision_manufacturing</span>
-</a>
-<a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
-<span class="material-symbols-outlined">settings_input_component</span>
-</a>
-<a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
-<span class="material-symbols-outlined">history_edu</span>
-</a>
-</nav>
-<!-- Floating AI Chatbot Button -->
-<button class="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-50 w-14 h-14 bg-cyan-400 text-slate-950 rounded-sm shadow-[0_0_30px_rgba(0,215,255,0.4)] flex items-center justify-center group transition-all hover:scale-110">
-<span class="material-symbols-outlined">smart_toy</span>
-<div class="absolute right-full mr-4 bg-slate-900 px-4 py-2 text-xs uppercase tracking-widest text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border-l border-cyan-400">
-            Agent Query System
+  <!-- TopAppBar Shell -->
+  <header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0a0c10] dark:bg-slate-950">
+    <div class="flex items-center gap-3">
+      <img src="/logo.svg" alt="Precision Observer Logo" class="w-8 h-8" />
+      <h1 class="text-xl font-bold tracking-tighter text-cyan-400 uppercase font-['Space_Grotesk']">
+        PRECISION_OBSERVER_v1.0</h1>
+    </div>
+    <div class="hidden md:flex gap-8">
+      <nav class="flex gap-6 text-sm">
+        <a class="text-cyan-400 border-b-2 border-cyan-400 pb-1 font-['Space_Grotesk'] font-bold tracking-tight"
+          href="#">EDA</a>
+        <a class="text-slate-400 font-light font-['Space_Grotesk'] hover:text-cyan-200 transition-colors"
+          href="#">Visualizations</a>
+        <a class="text-slate-400 font-light font-['Space_Grotesk'] hover:text-cyan-200 transition-colors" href="#">Model
+          Performance</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-full border border-cyan-400/30 p-0.5 overflow-hidden">
+        <img alt="Scientist Profile"
+          class="w-full h-full object-cover rounded-full grayscale hover:grayscale-0 transition-all"
+          data-alt="Portrait of a data scientist in high contrast"
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe06XV7tq9KWqpGa8qmsoEJrJ1dWQR9fn0Tb9k1BkMyIBUYxw700zCTvTtHlJ_zuCE2Hf__QRfwM-FpEWKKPhHJLglDNaiftXlUQLMO74llxvQthO6TmOlkFMYHwOJIuf8mF8_KNVS6aUY2WJJ-VOq0YFXdNF-gnKgi1yR3BPWpPQ_8p4hMEHgmuqM_KTUgr8FM7YkIJGlS1CSLGQ0yviz6_nBkcOzIKopswHm6p9uYNkqG5OMojvdC5IPvp8ZY_0Z1Rd0qUHlvoab" />
+      </div>
+    </div>
+  </header>
+  <!-- NavigationDrawer Shell (Desktop Only) -->
+  <aside
+    class="fixed left-0 top-0 h-full z-40 flex flex-col pt-20 bg-[#12141a] dark:bg-slate-900 w-64 hidden md:flex shadow-2xl shadow-cyan-900/10">
+    <div class="px-6 mb-8">
+      <p class="text-cyan-400 font-bold font-['Outfit'] font-light text-sm uppercase tracking-widest">AGENT_CORE</p>
+    </div>
+    <nav class="flex flex-col gap-1">
+      <a class="bg-cyan-500/10 text-cyan-400 border-r-4 border-cyan-400 px-4 py-3 flex items-center gap-3 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">analytics</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">EDA</span>
+      </a>
+      <a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">insights</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">Visualizations</span>
+      </a>
+      <a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">monitoring</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">Model Performance</span>
+      </a>
+      <a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">online_prediction</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">Predictions</span>
+      </a>
+      <a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">psychology</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">AI Explanation</span>
+      </a>
+      <a class="text-slate-500 px-4 py-3 flex items-center gap-3 hover:bg-slate-800/50 hover:text-cyan-300 transition-all duration-300 ease-in-out"
+        href="#">
+        <span class="material-symbols-outlined">terminal</span>
+        <span class="font-['Outfit'] text-sm uppercase tracking-widest">Logs</span>
+      </a>
+    </nav>
+    <div class="mt-auto p-6">
+      <div class="p-4 bg-surface-container-low rounded-sm border-l-2 border-cyan-400">
+        <p class="text-[10px] text-cyan-400 uppercase tracking-widest mb-1">Status</p>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          <p class="text-xs font-mono text-on-surface">PROCESSING_STREAM_B</p>
         </div>
-</button>
-</body></html>
+      </div>
+    </div>
+  </aside>
+  <!-- Main Content Canvas -->
+  <main class="md:ml-64 pt-16 pb-24 md:pb-8 px-6 min-h-screen bg-surface">
+    <!-- Interactive 3D Hero Section -->
+    <section class="mt-6 mb-12">
+      <div
+        class="relative w-full h-[450px] bg-slate-900 rounded-sm overflow-hidden spotlight flex items-center p-12 border border-white/5">
+        <div class="w-full md:w-1/2 z-10">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[10px] font-bold tracking-widest uppercase">Live
+              Module</span>
+            <div class="h-px w-12 bg-cyan-400/30"></div>
+          </div>
+          <h2 class="text-5xl font-['Space_Grotesk'] font-bold text-on-surface mb-4 leading-tight">Interactive 3D</h2>
+          <p class="text-xl font-['Outfit'] font-light text-slate-400 mb-8 max-w-md">Bring your UI to life with
+            autonomous spatial awareness and deep-learning visualization layers.</p>
+          <button
+            class="bg-primary-container text-on-primary-container px-8 py-3 rounded-sm font-['Space_Grotesk'] font-bold uppercase tracking-wider hover:shadow-[0_0_20px_rgba(0,215,255,0.3)] transition-all">
+            Initialize Engine
+          </button>
+        </div>
+        <!-- 3D Robot Embed Reference -->
+        <div class="absolute right-0 top-0 w-full md:w-3/5 h-full opacity-80 md:opacity-100 pointer-events-none">
+          <img alt="3D Robot Visualization" class="w-full h-full object-contain object-right"
+            data-alt="Futuristic white 3D robot on a dark technical background"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDm0iVeGh0GB8zKq7QGEQXMoWmTSUv9WRlCPjjk_N1N0VwowMWLEu1FfKbvnYdh9J134xH3UM9mZKg6K6J7l4KCtX11A99815IGhVbTCOD62rb1zuRSEQE_T5tHaq5PCCRhswlrtQMXCHUVZnEXyzl3eji2ZBFePB4fw1IJ6LYGKOnK_Ua3p6gc8-oguroeoUQJShOqFdD1NzyymJAlf99bsssOXrj2MmIX8Dr6SgTxjwwwlXxXvbmwOwxQxh0fATd-mHT63BMIOoC2" />
+          <!-- Technical overlays -->
+          <div class="absolute inset-0 bg-gradient-to-l from-transparent via-slate-900/40 to-slate-900"></div>
+        </div>
+      </div>
+    </section>
+    <!-- Bento Grid Metrics Section -->
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+      <!-- Metric 1 -->
+      <div class="md:col-span-1 bg-surface-container-low p-6 rounded-sm relative overflow-hidden group">
+        <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] mb-2">Model Accuracy</p>
+        <h3 class="text-4xl font-['Space_Grotesk'] font-bold text-cyan-400">98.42%</h3>
+        <div class="mt-4 flex items-center gap-2 text-tertiary text-xs">
+          <span class="material-symbols-outlined text-sm">trending_up</span>
+          <span>+1.2% VS PREVIOUS_EPOCH</span>
+        </div>
+        <div class="absolute bottom-0 left-0 w-full h-1 bg-cyan-500/20"></div>
+        <div class="absolute bottom-0 left-0 w-[98%] h-1 bg-cyan-400"></div>
+      </div>
+      <!-- Metric 2 -->
+      <div class="md:col-span-1 bg-surface-container-low p-6 rounded-sm relative overflow-hidden">
+        <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] mb-2">AUC-ROC Score</p>
+        <h3 class="text-4xl font-['Space_Grotesk'] font-bold text-on-surface">0.992</h3>
+        <div class="mt-4 flex items-center gap-2 text-slate-500 text-xs uppercase tracking-widest">
+          <span>Precision: 0.988</span>
+        </div>
+      </div>
+      <!-- Metric 3: Log Stream -->
+      <div class="md:col-span-2 bg-surface-container-low p-6 rounded-sm">
+        <div class="flex justify-between items-center mb-4">
+          <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Processing Log</p>
+          <span class="text-[10px] text-cyan-400 font-mono">STREAMING LIVE</span>
+        </div>
+        <div class="font-mono text-[11px] space-y-1.5 text-slate-400">
+          <div class="flex gap-4">
+            <span class="text-cyan-600">14:20:11</span>
+            <span>[INFO] Correlation matrix computed for set_v4</span>
+          </div>
+          <div class="flex gap-4">
+            <span class="text-cyan-600">14:20:13</span>
+            <span>[WARN] Null variance detected in 'sensor_09'</span>
+          </div>
+          <div class="flex gap-4">
+            <span class="text-cyan-600">14:20:15</span>
+            <span class="text-on-surface">Processing deep-feature extraction...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Visualization Section (Asymmetric) -->
+    <section class="grid grid-cols-1 md:grid-cols-12 gap-12 items-start mb-12">
+      <!-- Left: Large Visualization -->
+      <div class="md:col-span-8">
+        <div class="mb-6">
+          <h4 class="text-xl font-['Space_Grotesk'] font-bold uppercase tracking-tight mb-2">Variable Distribution</h4>
+          <p class="text-sm text-slate-500 max-w-lg">Autonomous scan of feature density across the primary dataset
+            dimension.</p>
+        </div>
+        <div class="w-full aspect-[21/9] glass-panel p-8 relative overflow-hidden flex items-end gap-1">
+          <!-- Dummy Chart Representation -->
+          <div class="flex-1 bg-cyan-400/20 h-1/4 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/30 h-1/3 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/40 h-1/2 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/50 h-2/3 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/60 h-3/4 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/80 h-[90%] rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/60 h-3/4 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/50 h-2/3 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/40 h-1/2 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/30 h-1/3 rounded-t-sm"></div>
+          <div class="flex-1 bg-cyan-400/20 h-1/4 rounded-t-sm"></div>
+          <!-- Axis Label -->
+          <div class="absolute bottom-2 left-8 text-[9px] uppercase tracking-[0.3em] text-slate-600">Normalization
+            Index: Sigma-4</div>
+        </div>
+      </div>
+      <!-- Right: Secondary Visualization -->
+      <div class="md:col-span-4 flex flex-col gap-8">
+        <div>
+          <h4 class="text-xl font-['Space_Grotesk'] font-bold uppercase tracking-tight mb-4">Correlation Matrix</h4>
+          <div class="grid grid-cols-4 grid-rows-4 gap-1">
+            <!-- Heatmap Mockup -->
+            <div class="aspect-square bg-cyan-400/90"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/30"></div>
+            <div class="aspect-square bg-cyan-400/10"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/90"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/30"></div>
+            <div class="aspect-square bg-cyan-400/30"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/90"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/10"></div>
+            <div class="aspect-square bg-cyan-400/30"></div>
+            <div class="aspect-square bg-cyan-400/60"></div>
+            <div class="aspect-square bg-cyan-400/90"></div>
+          </div>
+        </div>
+        <div class="p-6 bg-surface-container-high rounded-sm">
+          <h5 class="text-xs font-bold text-cyan-400 uppercase tracking-[0.2em] mb-3">Agent Reasoning</h5>
+          <p class="text-sm text-slate-400 font-light leading-relaxed">High correlation detected between 'latency_idx'
+            and 'energy_out'. Recommendation: apply PCA to reduce redundant dimensions.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <!-- BottomNavBar Shell (Mobile Only) -->
+  <nav
+    class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 md:hidden bg-[#0a0c10]/80 backdrop-blur-xl border-t border-white/10 rounded-t-lg shadow-[0_-10px_30px_rgba(0,215,255,0.1)]">
+    <a class="flex flex-col items-center justify-center bg-cyan-500/20 text-cyan-400 rounded-lg p-2 active:scale-95 transition-all"
+      href="#">
+      <span class="material-symbols-outlined">smart_toy</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
+      <span class="material-symbols-outlined">query_stats</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
+      <span class="material-symbols-outlined">precision_manufacturing</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
+      <span class="material-symbols-outlined">settings_input_component</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-slate-500 p-2 active:scale-95 transition-all" href="#">
+      <span class="material-symbols-outlined">history_edu</span>
+    </a>
+  </nav>
+  <!-- Floating AI Chatbot Button -->
+  <button
+    class="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-50 w-14 h-14 bg-cyan-400 text-slate-950 rounded-sm shadow-[0_0_30px_rgba(0,215,255,0.4)] flex items-center justify-center group transition-all hover:scale-110">
+    <span class="material-symbols-outlined">smart_toy</span>
+    <div
+      class="absolute right-full mr-4 bg-slate-900 px-4 py-2 text-xs uppercase tracking-widest text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border-l border-cyan-400">
+      Agent Query System
+    </div>
+  </button>
+</body>
+
+</html>
