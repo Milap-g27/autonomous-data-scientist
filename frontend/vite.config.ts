@@ -11,5 +11,14 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@splinetool')) return 'spline-runtime'
+          if (id.includes('framer-motion') || id.includes('motion-dom')) return 'framer'
+          if (id.includes('react-dom') || id.includes('react-router')) return 'react-vendor'
+        },
+      },
+    },
   },
 })

@@ -1,10 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { Upload, Zap, Brain, BarChart2 } from 'lucide-react';
-import { useState, useCallback, lazy, Suspense } from 'react';
+import { useState, useCallback } from 'react';
+import { SplineSceneBasic } from '../components/ui/demo';
 import { EvervaultCard, Icon } from '../components/ui/evervault-card';
 import { uploadDataset, type DatasetInfo } from '../services/api';
-
-const SplineSceneBasic = lazy(() => import('../components/ui/demo').then(m => ({ default: m.SplineSceneBasic })));
 
 interface Props {
   onSessionCreated: (sessionId: string, info: DatasetInfo) => void;
@@ -39,11 +38,9 @@ export default function HomePage({ onSessionCreated }: Props) {
 
   return (
     <div className="space-y-12">
-      {/* 3D Hero — always visible on home */}
-      <section className="min-h-[400px]">
-        <Suspense fallback={<div className="w-full h-[400px] flex items-center justify-center text-neutral-400">Loading 3D Scene...</div>}>
-          <SplineSceneBasic />
-        </Suspense>
+      {/* 3D Hero — static by default, loads 3D on interaction */}
+      <section>
+        <SplineSceneBasic />
       </section>
 
       {/* Upload Section */}
