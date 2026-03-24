@@ -55,6 +55,7 @@ export interface PredictResponse {
 
 export interface ChatResponse {
   reply: string;
+  image_base64?: string;
 }
 
 // ── API Client ──

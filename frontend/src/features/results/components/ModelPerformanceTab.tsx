@@ -85,11 +85,7 @@ export default function ModelPerformanceTab({ result }: Props) {
         </div>
       )}
 
-      {/* Best Model Badge */}
-      <div className="py-3 px-6 rounded-xl bg-neutral-800/50 border border-white/10 inline-block">
-        <span className="text-neutral-400 text-sm font-medium">Best Performing Model: </span>
-        <span className="text-white font-bold text-sm">{bestModel}</span>
-      </div>
+
     </div>
   );
 }

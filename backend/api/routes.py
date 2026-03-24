@@ -251,14 +251,18 @@ async def chat(req: ChatRequest):
     if not api_key:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured.")
 
-    reply = await _get_chat_response(session, req.message, api_key)
-    return ChatResponse(reply=reply)
+    reply, image_base64 = await _get_chat_response(session, req.message, api_key)
+    return ChatResponse(reply=reply, image_base64=image_base64)
 
 
-async def _get_chat_response(session: Session, user_message: str, api_key: str) -> str:
+async def _get_chat_response(session: Session, user_message: str, api_key: str) -> tuple[str, str | None]:
     """Call ChatGroq asynchronously with session context."""
     from langchain_groq import ChatGroq
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+    import re
+    import base64
+    import matplotlib.pyplot as plt
+    import seaborn as sns
 
     _REJECTION = "I can only answer questions related to the current dataset and model analysis."
     _SYSTEM_TEMPLATE = """You are an expert data science assistant embedded in the Autonomous Data Scientist application.
@@ -269,8 +273,35 @@ You answer questions ONLY about:
 - The AI explanation generated for this analysis
 - General machine learning theory and best practices
 
-If the user asks anything unrelated, respond EXACTLY with:
-"{rejection}"
+If the user asks for a plot or visualization (e.g. correlation matrix, scatter plot, distribution), you MUST generate python code to create it.
+CRITICAL PLOTTING RULES:
+1. ALWAYS handle `NaN` values before plotting to prevent empty graphs (e.g., `data = df[col].dropna()`).
+2. If iterating over columns to create subplots, ensure the data passed to seaborn/matplotlib is valid and correctly bound to `ax=...` (e.g., `sns.boxplot(y=data, ax=ax)`).
+3. If using multiple subplots, finish by calling `plt.tight_layout()`.
+4. Do NOT call `plt.show()`, just create the figure.
+5. IF the user asks for multiple distinct plots at once, you MUST combine them into a single Figure using `fig, axes = plt.subplots(...)` so that all plots are generated within the same image.
+6. RESTRICTION: You are allowed EXACTLY ONE `<PLOT>` pair per response. NEVER use multiple `<PLOT>` tags. Combine all python plotting code into a single `<PLOT>` block.
+
+You MUST enclose the raw python plotting code exactly within `<PLOT>` and `</PLOT>` tags.
+Do NOT use markdown code blocks inside the tags.
+Example:
+<PLOT>
+import seaborn as sns
+import matplotlib.pyplot as plt
+fig, axes = plt.subplots(1, 2)
+sns.histplot(df['col1'].dropna(), ax=axes[0])
+sns.histplot(df['col2'].dropna(), ax=axes[1])
+plt.tight_layout()
+</PLOT>
+
+You have access to the pandas DataFrame via the global variable `df`.
+
+You SHOULD answer questions about the dataset summary, statistics (like mean, min, max, missing values), model configuration, or model results using the provided context below. Analyze the provided summary statistics if the user asks for insights, averages, or distributions.
+
+FORMATTING RULE: Use markdown formatting. ALWAYS use backticks `` ` `` to highlight column names, metric names, and inline code (e.g. `` `focus_score` ``).
+
+If the user asks a question that is COMPLETELY UNRELATED to data science, this dataset, or the analysis, respond EXACTLY with:
+"I can only answer questions related to the current dataset and model analysis."
 
 Here is the current session context:
 
@@ -335,14 +366,76 @@ Here is the current session context:
         response = await llm.ainvoke(messages)
         reply = str(response.content)
 
+        # Plot Interception Logic
+        image_base64 = None
+        
+        # New XML-based robust tag extraction
+        if "<PLOT>" in reply and "</PLOT>" in reply:
+            try:
+                start_idx = reply.find("<PLOT>") + len("<PLOT>")
+                end_idx = reply.find("</PLOT>")
+                code_to_run = reply[start_idx:end_idx].strip()
+                
+                # Fallback cleanups in case the LLM still wraps with markdown inside the tags
+                if code_to_run.startswith("```python"): code_to_run = code_to_run[9:].strip()
+                elif code_to_run.startswith("```"): code_to_run = code_to_run[3:].strip()
+                if code_to_run.endswith("```"): code_to_run = code_to_run[:-3].strip()
+                
+                plt.clf()
+                local_vars = {"df": session.df, "plt": plt, "sns": sns, "pd": pd}
+                exec(code_to_run, local_vars)
+                
+                fig = plt.gcf()
+                if fig and fig.axes:
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight")
+                    buf.seek(0)
+                    image_base64 = base64.b64encode(buf.read()).decode("utf-8")
+                plt.close(fig)
+                
+                # Remove the raw code block from the user's view
+                full_tag_block = reply[reply.find("<PLOT>"):end_idx + len("</PLOT>")]
+                reply = reply.replace(full_tag_block, "\n*Here is the plot you requested:*\n")
+            except Exception as e:
+                print(f"Plot execution failed: {e}")
+                reply += f"\n\n*(Note: Failed to generate plot: {e})*"
+        # Fallback for older generations if it still uses # PLOT
+        elif "# PLOT" in reply and image_base64 is None:
+            match = re.search(r"```(?:python)?\s*# PLOT\s*(.*?)\n```", reply, re.DOTALL)
+            if not match:
+                match = re.search(r"```(?:python)?\s*\n?(.*?)\n```", reply, re.DOTALL)
+                
+            if match and "# PLOT" in match.group(0):
+                code_to_run = match.group(1).strip()
+                if code_to_run.startswith("# PLOT"):
+                    code_to_run = code_to_run.replace("# PLOT", "", 1).strip()
+
+                try:
+                    plt.clf()
+                    local_vars = {"df": session.df, "plt": plt, "sns": sns, "pd": pd}
+                    exec(code_to_run, local_vars)
+                    
+                    fig = plt.gcf()
+                    if fig and fig.axes:
+                        buf = io.BytesIO()
+                        fig.savefig(buf, format="png", bbox_inches="tight")
+                        buf.seek(0)
+                        image_base64 = base64.b64encode(buf.read()).decode("utf-8")
+                    plt.close(fig)
+                    
+                    reply = reply.replace(match.group(0), "\n*Here is the plot you requested:*\n")
+                except Exception as e:
+                    print(f"Plot execution failed: {e}")
+                    reply += f"\n\n*(Note: Failed to generate plot: {e})*"
+
         # Persist history
         session.chat_history.append({"role": "user", "content": user_message})
         session.chat_history.append({"role": "assistant", "content": reply})
 
-        return reply
+        return reply, image_base64
 
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error: {e}", None
 
 
 # ── Sessions management ────────────────────

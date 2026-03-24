@@ -92,6 +92,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    image_base64: Optional[str] = None
 
 
 # ── Task / Status ──────────────────────────

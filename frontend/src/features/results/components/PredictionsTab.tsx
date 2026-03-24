@@ -14,7 +14,18 @@ export default function PredictionsTab({ result, sessionId, preview, target }: P
   const [prediction, setPrediction] = useState<{ value: unknown; model: string } | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const [formValues, setFormValues] = useState<Record<string, unknown>>(() => {
+    const initial: Record<string, unknown> = {};
+    if (preview.length > 0) {
+      const firstRow = preview[0];
+      Object.keys(firstRow).forEach(col => {
+        if (col !== target) {
+          initial[col] = firstRow[col];
+        }
+      });
+    }
+    return initial;
+  });
 
   const problemType = result.problem_type || '';
 
@@ -117,7 +128,9 @@ export default function PredictionsTab({ result, sessionId, preview, target }: P
           <p className="text-neutral-500 text-sm mb-2">Predicted Value</p>
           <h3 className="text-white font-bold text-lg mb-1">{target}</h3>
           <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 my-4">
-            {String(prediction.value)}
+            {problemType === 'Regression' && typeof prediction.value === 'number'
+              ? prediction.value.toFixed(2)
+              : String(prediction.value)}
           </h2>
           <p className="text-neutral-600 text-xs">Model: {prediction.model}</p>
         </div>
