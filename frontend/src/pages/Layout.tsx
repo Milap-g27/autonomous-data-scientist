@@ -39,7 +39,7 @@ export default function Layout({ sessionId, hasResults }: Props) {
                 to={item.to}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all ${isActive
                   ? 'bg-neutral-800 text-neutral-200'
-                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-900'
+                  : 'text-neutral-400 hover:text-neutral-300 hover:bg-neutral-900'
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" />

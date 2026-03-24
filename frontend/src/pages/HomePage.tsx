@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { Upload, Zap, Brain, BarChart2 } from 'lucide-react';
-import { useState, useCallback } from 'react';
-import { SplineSceneBasic } from '../components/ui/demo';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { EvervaultCard, Icon } from '../components/ui/evervault-card';
 import { uploadDataset, type DatasetInfo } from '../services/api';
+
+const SplineSceneBasic = lazy(() => import('../components/ui/demo').then(m => ({ default: m.SplineSceneBasic })));
 
 interface Props {
   onSessionCreated: (sessionId: string, info: DatasetInfo) => void;
@@ -39,8 +40,10 @@ export default function HomePage({ onSessionCreated }: Props) {
   return (
     <div className="space-y-12">
       {/* 3D Hero — always visible on home */}
-      <section>
-        <SplineSceneBasic />
+      <section className="min-h-[400px]">
+        <Suspense fallback={<div className="w-full h-[400px] flex items-center justify-center text-neutral-400">Loading 3D Scene...</div>}>
+          <SplineSceneBasic />
+        </Suspense>
       </section>
 
       {/* Upload Section */}
@@ -48,10 +51,10 @@ export default function HomePage({ onSessionCreated }: Props) {
         <h2 className="text-2xl md:text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 mb-2">
           Data Injection
         </h2>
-        <p className="text-sm text-neutral-400 mb-8">Upload your CSV dataset to start the autonomous analysis pipeline.</p>
+        <p className="text-sm text-neutral-300 mb-8">Upload your CSV dataset to start the autonomous analysis pipeline.</p>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-900/10 text-red-400 text-sm">{error}</div>
+          <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-900/10 text-red-200 text-sm">{error}</div>
         )}
 
         <div
@@ -59,16 +62,16 @@ export default function HomePage({ onSessionCreated }: Props) {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => document.getElementById('file-input')?.click()}
-          className={`w-full border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all ${dragOver ? 'border-white/50 bg-neutral-900' : 'border-neutral-700/50 bg-neutral-950/50 hover:bg-neutral-900/50 hover:border-neutral-600'
+          className={`w-full border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all ${dragOver ? 'border-white/50 bg-neutral-900' : 'border-neutral-700/50 bg-neutral-950/50 hover:bg-neutral-600 hover:border-neutral-500'
             }`}
         >
           <div className="w-16 h-16 rounded-full bg-neutral-800/50 flex items-center justify-center mb-4">
-            <Upload className={`w-8 h-8 text-neutral-300 ${uploading ? 'animate-pulse' : ''}`} />
+            <Upload className={`w-8 h-8 text-neutral-200 ${uploading ? 'animate-pulse' : ''}`} />
           </div>
-          <p className="text-neutral-200 font-medium text-lg mb-2">
+          <p className="text-neutral-100 font-medium text-lg mb-2">
             {uploading ? 'Processing...' : 'Drag & Drop CSV Here'}
           </p>
-          <p className="text-neutral-500 text-xs tracking-widest uppercase">or click to browse</p>
+          <p className="text-neutral-400 text-xs tracking-widest uppercase">or click to browse</p>
         </div>
         <input
           id="file-input"
