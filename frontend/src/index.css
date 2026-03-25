@@ -75,3 +75,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Text selection — OUTSIDE @layer so it has full specificity over Tailwind */
+*::selection {
+  background-color: rgba(56, 139, 253, 0.4) !important;
+  color: #ffffff !important;
+}
+
+*::-moz-selection {
+  background-color: rgba(56, 139, 253, 0.4) !important;
+  color: #ffffff !important;
+}

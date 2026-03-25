@@ -223,7 +223,13 @@ async def predict(req: PredictRequest):
         predicted_value = prediction[0]
 
         # Decode label if original target was categorical
-        if df_original[target].dtype == "object" or df_original[target].dtype.name == "category":
+        # Use pd.api.types checks to handle both legacy 'object' and pandas 2.x StringDtype
+        target_dtype = df_original[target].dtype
+        is_categorical_target = (
+            pd.api.types.is_string_dtype(df_original[target])
+            or isinstance(target_dtype, pd.CategoricalDtype)
+        )
+        if is_categorical_target:
             from sklearn.preprocessing import LabelEncoder
             le = LabelEncoder()
             le.fit(df_original[target].astype(str))
@@ -263,50 +269,51 @@ async def _get_chat_response(session: Session, user_message: str, api_key: str) 
     import base64
     import matplotlib.pyplot as plt
     import seaborn as sns
+    import pandas as pd
+    import numpy as np
 
     _REJECTION = "I can only answer questions related to the current dataset and model analysis."
-    _SYSTEM_TEMPLATE = """You are an expert data science assistant embedded in the Autonomous Data Scientist application.
-You answer questions ONLY about:
-- The uploaded dataset (columns, types, distributions)
-- Feature engineering and data cleaning steps performed
-- Model performance and evaluation metrics
-- The AI explanation generated for this analysis
-- General machine learning theory and best practices
+    _SYSTEM_TEMPLATE = """You are a concise data science assistant embedded in the Autonomous Data Scientist application.
 
-If the user asks for a plot or visualization (e.g. correlation matrix, scatter plot, distribution), you MUST generate python code to create it.
-CRITICAL PLOTTING RULES:
-1. ALWAYS handle `NaN` values before plotting to prevent empty graphs (e.g., `data = df[col].dropna()`).
-2. If iterating over columns to create subplots, ensure the data passed to seaborn/matplotlib is valid and correctly bound to `ax=...` (e.g., `sns.boxplot(y=data, ax=ax)`).
-3. If using multiple subplots, finish by calling `plt.tight_layout()`.
-4. Do NOT call `plt.show()`, just create the figure.
-5. IF the user asks for multiple distinct plots at once, you MUST combine them into a single Figure using `fig, axes = plt.subplots(...)` so that all plots are generated within the same image.
-6. RESTRICTION: You are allowed EXACTLY ONE `<PLOT>` pair per response. NEVER use multiple `<PLOT>` tags. Combine all python plotting code into a single `<PLOT>` block.
+STRICT RULES — FOLLOW EXACTLY:
+1. Answer ONLY the user's LATEST message. NEVER repeat, summarize, or re-answer previous questions.
+2. ONLY use information from the session context provided below. If the information is not available in the context, say "This information is not available in the current session results." Do NOT guess, fabricate, or derive values that aren't explicitly present.
+3. NEVER generate code to retrain models, split data, or re-run analysis. The analysis has already been completed.
+4. Be extremely concise. Give direct answers. No unnecessary preamble, formulas, or lengthy explanations.
+5. Only generate a <PLOT> block when the user EXPLICITLY asks for a plot, chart, or visualization. NEVER generate <PLOT> for non-visual questions.
 
-You MUST enclose the raw python plotting code exactly within `<PLOT>` and `</PLOT>` tags.
-Do NOT use markdown code blocks inside the tags.
-Example:
+PLOTTING RULES (only when user asks for a visualization):
+1. ALWAYS handle NaN values before plotting (e.g., `data = df[col].dropna()`).
+2. Use `plt.tight_layout()` for multi-subplot figures.
+3. Do NOT call `plt.show()`.
+4. Use EXACTLY ONE `<PLOT>...</PLOT>` pair per response.
+5. You have access to the DataFrame via the global variable `df`. Use ONLY `df` — do NOT import sklearn or retrain models.
+6. Do NOT use markdown code blocks inside the tags.
+
+Example plot response:
 <PLOT>
 import seaborn as sns
 import matplotlib.pyplot as plt
-fig, axes = plt.subplots(1, 2)
-sns.histplot(df['col1'].dropna(), ax=axes[0])
-sns.histplot(df['col2'].dropna(), ax=axes[1])
+fig, ax = plt.subplots()
+sns.heatmap(df.select_dtypes(include='number').corr(), annot=True, ax=ax)
 plt.tight_layout()
 </PLOT>
 
-You have access to the pandas DataFrame via the global variable `df`.
+FORMATTING: Use markdown. Use backticks for column/metric names with NO spaces inside — correct: `focus_score`, WRONG: ` focus_score `.
 
-You SHOULD answer questions about the dataset summary, statistics (like mean, min, max, missing values), model configuration, or model results using the provided context below. Analyze the provided summary statistics if the user asks for insights, averages, or distributions.
-
-FORMATTING RULE: Use markdown formatting. ALWAYS use backticks to highlight column names, metric names, and inline code. Backticks must wrap the name with NO spaces inside — correct: `focus_score`, WRONG: ` focus_score ` or ` focus_score`.
-
-If the user asks a question that is COMPLETELY UNRELATED to data science, this dataset, or the analysis, respond EXACTLY with:
+If the question is COMPLETELY UNRELATED to data science or this dataset, respond EXACTLY with:
 "I can only answer questions related to the current dataset and model analysis."
 
-Here is the current session context:
+--- SESSION CONTEXT ---
+
+### Problem Type
+{problem_type}
 
 ### Dataset Summary
 {dataset_summary}
+
+### EDA Statistics & Insights
+{eda_results}
 
 ### Model Configuration
 {model_config}
@@ -324,20 +331,55 @@ Here is the current session context:
 {feature_report}
 """
 
+
     dataset_summary = (
         build_dataset_summary(session.df, session.config.get("target"))
         if session.df is not None
         else "No dataset uploaded yet."
     )
+    problem_type = session.result.get("problem_type", "Unknown") if session.result else "Not determined yet."
+    
+    eda_data = session.result.get("eda_results", {}) if session.result else {}
+    if eda_data:
+        eda_lines = []
+        if "columns" in eda_data:
+            eda_lines.append(f"Columns used in analysis: {', '.join(f'`{c}`' for c in eda_data['columns'])}")
+        if "top_correlated_features" in eda_data:
+            eda_lines.append(f"Top features: {', '.join(f'`{c}`' for c in eda_data['top_correlated_features'])}")
+        if "description" in eda_data:
+            eda_lines.append("\nDescriptive Statistics:")
+            try:
+                desc_df = pd.DataFrame.from_dict(eda_data["description"])
+                eda_lines.append(desc_df.to_string())
+            except Exception:
+                eda_lines.append(str(eda_data["description"]))
+        eda_results = "\n".join(eda_lines)
+    else:
+        eda_results = "No EDA results available yet."
+
     model_config = str(session.config) if session.config else "Not configured yet."
-    model_results = str(session.result.get("metrics", {})) if session.result else "No results yet."
+    if session.result:
+        raw_metrics = session.result.get("metrics", {})
+        best_model = session.result.get("model_name", "Unknown")
+        # Format all model metrics into a readable string
+        lines = [f"Best model: {best_model}"]
+        for model_name, scores in raw_metrics.items():
+            if isinstance(scores, dict):
+                score_str = ", ".join(f"{k}: {v}" for k, v in scores.items())
+                lines.append(f"- {model_name}: {score_str}")
+            else:
+                lines.append(f"- {model_name}: {scores}")
+        model_results = "\n".join(lines)
+    else:
+        model_results = "No results yet."
     ai_explanation = session.result.get("explanation", "No explanation generated yet.") if session.result else "No explanation generated yet."
     cleaning_report = session.result.get("cleaning_report", "No cleaning report yet.") if session.result else "No cleaning report yet."
     feature_report = session.result.get("feature_report", "No feature engineering report yet.") if session.result else "No feature engineering report yet."
 
     system_prompt = _SYSTEM_TEMPLATE.format(
-        rejection=_REJECTION,
+        problem_type=problem_type,
         dataset_summary=dataset_summary,
+        eda_results=eda_results,
         model_config=model_config,
         model_results=model_results,
         ai_explanation=ai_explanation,
@@ -356,11 +398,16 @@ Here is the current session context:
         messages: list = [SystemMessage(content=system_prompt)]
 
         # Include recent history (last 6 exchanges)
+        # Truncate long AI responses to avoid the LLM echoing/repeating old answers
         for msg in session.chat_history[-12:]:
             if msg["role"] == "user":
                 messages.append(HumanMessage(content=msg["content"]))
             else:
-                messages.append(AIMessage(content=msg["content"]))
+                # Keep AI history short so the model doesn't re-generate previous replies
+                summary = msg["content"]
+                if len(summary) > 300:
+                    summary = summary[:300] + "…[truncated]"
+                messages.append(AIMessage(content=summary))
         messages.append(HumanMessage(content=user_message))
 
         response = await llm.ainvoke(messages)
