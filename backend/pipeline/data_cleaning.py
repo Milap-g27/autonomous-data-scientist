@@ -8,10 +8,32 @@ def clean_data(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     Returns the cleaned dataframe and a textual report of changes.
     """
     report = []
-    
+
+    # 0. Normalise pandas 2.x extension dtypes to numpy-compatible equivalents.
+    #    pd.read_csv with pandas >= 2.0 may return StringDtype / BooleanDtype /
+    #    Int64Dtype columns that numpy (and np.issubdtype) cannot interpret.
+    df = df.copy()
+    for col in df.columns:
+        dtype = df[col].dtype
+        # Convert nullable integer / float extension types → standard numpy dtype
+        if hasattr(dtype, 'numpy_dtype'):
+            try:
+                df[col] = df[col].astype(dtype.numpy_dtype)
+            except (TypeError, ValueError):
+                df[col] = df[col].astype(object)
+        # Convert StringDtype → object
+        elif isinstance(dtype, pd.StringDtype):
+            df[col] = df[col].astype(object)
+        # Convert BooleanDtype → bool
+        elif isinstance(dtype, pd.BooleanDtype):
+            try:
+                df[col] = df[col].astype(bool)
+            except (TypeError, ValueError):
+                df[col] = df[col].astype(object)
+
     # 1. Drop duplicates
     initial_rows = len(df)
-    df = df.drop_duplicates().copy() # Ensure we are working with a copy
+    df = df.drop_duplicates().copy()
     dropped_rows = initial_rows - len(df)
     if dropped_rows > 0:
         report.append(f"Dropped {dropped_rows} duplicate rows.")
@@ -20,7 +42,7 @@ def clean_data(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     for col in df.columns:
         if df[col].isnull().sum() > 0:
             missing_count = df[col].isnull().sum()
-            if np.issubdtype(df[col].dtype, np.number):
+            if pd.api.types.is_numeric_dtype(df[col]):
                 # Fill numerical with median
                 median_val = df[col].median()
                 df[col] = df[col].fillna(median_val)

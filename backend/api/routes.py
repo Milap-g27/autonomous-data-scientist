@@ -298,7 +298,7 @@ You have access to the pandas DataFrame via the global variable `df`.
 
 You SHOULD answer questions about the dataset summary, statistics (like mean, min, max, missing values), model configuration, or model results using the provided context below. Analyze the provided summary statistics if the user asks for insights, averages, or distributions.
 
-FORMATTING RULE: Use markdown formatting. ALWAYS use backticks `` ` `` to highlight column names, metric names, and inline code (e.g. `` `focus_score` ``).
+FORMATTING RULE: Use markdown formatting. ALWAYS use backticks to highlight column names, metric names, and inline code. Backticks must wrap the name with NO spaces inside — correct: `focus_score`, WRONG: ` focus_score ` or ` focus_score`.
 
 If the user asks a question that is COMPLETELY UNRELATED to data science, this dataset, or the analysis, respond EXACTLY with:
 "I can only answer questions related to the current dataset and model analysis."

@@ -22,22 +22,26 @@ def build_dataset_summary(df, target) -> str:
     """Create a concise text summary of the dataset for chatbot context."""
     num_cols = df.select_dtypes(include='number').columns.tolist()
     cat_cols = df.select_dtypes(include=['object','category']).columns.tolist()
-    
+
+    def fmt_cols(cols):
+        return ", ".join(f"`{c}`" for c in cols) if cols else "None"
+
     lines = [
         f"Dataset: {df.shape[0]} rows × {df.shape[1]} columns",
-        f"Columns: {', '.join(df.columns.tolist())}",
-        f"Target: {target or 'None (Clustering)'}",
-        f"Numeric columns: {num_cols}",
-        f"Categorical columns: {cat_cols}",
+        f"Columns: {fmt_cols(df.columns.tolist())}",
+        f"Target: `{target}`" if target else "Target: None (Clustering)",
+        f"Numeric columns: {fmt_cols(num_cols)}",
+        f"Categorical columns: {fmt_cols(cat_cols)}",
         f"Missing values: {df.isnull().sum().sum()} total",
     ]
-    
+
     if len(num_cols) > 0:
         lines.append("\n--- Numeric Summary Statistics ---")
         lines.append(df[num_cols].describe().to_string())
-        
+
     if len(cat_cols) > 0:
         lines.append("\n--- Categorical Summary ---")
         lines.append(df[cat_cols].describe().to_string())
-        
+
     return "\n".join(lines)
+

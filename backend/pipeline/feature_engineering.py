@@ -30,6 +30,11 @@ def perform_feature_engineering(df: pd.DataFrame, target: Optional[str] = None, 
         # report.append(f"Found categorical columns: {categorical_cols}")
         # One-hot encode with drop_first=True to avoid dummy variable trap
         X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
+        # Pandas 2.x returns boolean dtype columns from get_dummies; cast to int
+        # so sklearn models (which expect numeric arrays) don't raise type errors.
+        bool_cols = X.select_dtypes(include='bool').columns
+        if len(bool_cols) > 0:
+            X[bool_cols] = X[bool_cols].astype(int)
         report.append(f"Applied One-Hot Encoding to: {', '.join(f'`{c}`' for c in categorical_cols)}. Total features now: {X.shape[1]}")
     
     # Re-identify numeric columns after encoding (all should be numeric now ideally, but good to be safe)
