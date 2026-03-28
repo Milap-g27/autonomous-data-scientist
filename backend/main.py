@@ -21,6 +21,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import logging
+from uuid import uuid4
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -31,11 +32,15 @@ import matplotlib
 matplotlib.use("Agg")  # non-interactive backend before any other mpl import
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from config import settings
 from api.routes import router
+from limiter import limiter
 
 app = FastAPI(
     title="Autonomous Data Scientist Agent",
@@ -45,6 +50,33 @@ app = FastAPI(
     ),
     version="2.0.0",
 )
+
+app.state.limiter = limiter
+if settings.RATE_LIMIT_ENABLED:
+    app.add_middleware(SlowAPIMiddleware)
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please try again later."},
+        )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = str(uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    logging.getLogger("request").info(
+        "request_id=%s method=%s path=%s status_code=%s",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+    )
+    return response
 
 # ── CORS ──
 app.add_middleware(

@@ -63,6 +63,16 @@ export interface AnalyzeResponse {
   message: string;
 }
 
+export interface AnalyzeStartResponse {
+  session_id: string;
+  status: "started";
+}
+
+export interface AnalysisStatusResponse {
+  status: "idle" | "running" | "completed" | "failed";
+  error?: string | null;
+}
+
 export interface PredictResponse {
   predicted_value: unknown;
   model_used: string;
@@ -104,11 +114,29 @@ export async function configureSession(cfg: ConfigureRequest): Promise<unknown> 
   return res.json();
 }
 
-export async function analyzeSession(sessionId: string): Promise<AnalyzeResponse> {
+export async function analyzeSession(sessionId: string): Promise<AnalyzeStartResponse> {
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  return res.json();
+}
+
+export async function getAnalysisStatus(sessionId: string): Promise<AnalysisStatusResponse> {
+  const res = await fetch(`${API_BASE}/status/${sessionId}`, {
+    method: "GET",
+    headers: { ...(await authHeaders()) },
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  return res.json();
+}
+
+export async function getAnalysisResult(sessionId: string): Promise<AnalyzeResponse> {
+  const res = await fetch(`${API_BASE}/results/${sessionId}`, {
+    method: "GET",
+    headers: { ...(await authHeaders()) },
   });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
   return res.json();

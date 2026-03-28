@@ -71,6 +71,11 @@ class AnalyzeResponse(BaseModel):
     message: str = "Analysis complete."
 
 
+class AnalyzeStartResponse(BaseModel):
+    session_id: str
+    status: str = "started"
+
+
 # ── Predict ─────────────────────────────────
 
 class PredictRequest(BaseModel):
@@ -87,7 +92,7 @@ class PredictResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     session_id: str
-    message: str
+    message: str = Field(..., min_length=1, max_length=4000)
 
 
 class PlotDiagnostics(BaseModel):
@@ -111,6 +116,11 @@ class TaskStatus(BaseModel):
     status: str  # "pending", "running", "completed", "failed"
     progress: Optional[str] = None
     result: Optional[AnalyzeResponse] = None
+    error: Optional[str] = None
+
+
+class SessionStatusResponse(BaseModel):
+    status: str
     error: Optional[str] = None
 
 

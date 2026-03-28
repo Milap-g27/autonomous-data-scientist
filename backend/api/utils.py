@@ -3,10 +3,12 @@ Utility helpers for the API layer.
 """
 import base64
 import io
+from typing import Any
 import matplotlib
 matplotlib.use("Agg")  # non-interactive backend — thread-safe
 import matplotlib.pyplot as plt
 import matplotlib.figure
+import pandas as pd
 
 
 def fig_to_base64(fig: matplotlib.figure.Figure) -> str:
@@ -44,4 +46,25 @@ def build_dataset_summary(df, target) -> str:
         lines.append(df[cat_cols].describe().to_string())
 
     return "\n".join(lines)
+
+
+def make_json_safe(obj: Any) -> Any:
+    """Recursively convert numpy / pandas types to native Python types."""
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [make_json_safe(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, (pd.Timestamp,)):
+        return obj.isoformat()
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    return obj
 

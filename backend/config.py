@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None
     PLOT_DEBUG: bool = False
+    RATE_LIMIT_ENABLED: bool = True
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     CORS_ORIGINS: str = "*"
