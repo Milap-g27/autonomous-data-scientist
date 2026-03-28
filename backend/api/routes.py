@@ -11,12 +11,18 @@ Endpoints:
   DELETE /sessions/{id} Delete a session
   GET  /health          Health check
 """
+import logging
 import asyncio
 import time
 import io
+import os
+import subprocess
+import tempfile
 import traceback
 from datetime import datetime
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
@@ -428,23 +434,13 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                 elif code_to_run.startswith("```"): code_to_run = code_to_run[3:].strip()
                 if code_to_run.endswith("```"): code_to_run = code_to_run[:-3].strip()
                 
-                plt.clf()
-                local_vars = {"df": session.df, "plt": plt, "sns": sns, "pd": pd}
-                exec(code_to_run, local_vars)
-                
-                fig = plt.gcf()
-                if fig and fig.axes:
-                    buf = io.BytesIO()
-                    fig.savefig(buf, format="png", bbox_inches="tight")
-                    buf.seek(0)
-                    image_base64 = base64.b64encode(buf.read()).decode("utf-8")
-                plt.close(fig)
+                image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
                 
                 # Remove the raw code block from the user's view
                 full_tag_block = reply[reply.find("<PLOT>"):end_idx + len("</PLOT>")]
                 reply = reply.replace(full_tag_block, "\n*Here is the plot you requested:*\n")
             except Exception as e:
-                print(f"Plot execution failed: {e}")
+                logger.error("Plot execution failed: %s", e, exc_info=True)
                 reply += f"\n\n*(Note: Failed to generate plot: {e})*"
         # Fallback for older generations if it still uses # PLOT
         elif "# PLOT" in reply and image_base64 is None:
@@ -458,21 +454,11 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                     code_to_run = code_to_run.replace("# PLOT", "", 1).strip()
 
                 try:
-                    plt.clf()
-                    local_vars = {"df": session.df, "plt": plt, "sns": sns, "pd": pd}
-                    exec(code_to_run, local_vars)
-                    
-                    fig = plt.gcf()
-                    if fig and fig.axes:
-                        buf = io.BytesIO()
-                        fig.savefig(buf, format="png", bbox_inches="tight")
-                        buf.seek(0)
-                        image_base64 = base64.b64encode(buf.read()).decode("utf-8")
-                    plt.close(fig)
+                    image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
                     
                     reply = reply.replace(match.group(0), "\n*Here is the plot you requested:*\n")
                 except Exception as e:
-                    print(f"Plot execution failed: {e}")
+                    logger.error("Plot execution failed: %s", e, exc_info=True)
                     reply += f"\n\n*(Note: Failed to generate plot: {e})*"
 
         # Persist history
@@ -522,3 +508,65 @@ def _make_json_safe(obj: Any) -> Any:
     if isinstance(obj, (np.bool_,)):
         return bool(obj)
     return obj
+
+
+def _run_plot_code_sandboxed(code: str, df_json: str) -> str | None:
+    import base64
+    import sys
+    PLOT_SCRIPT_TEMPLATE = """
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import seaborn as sns
+import sys, os
+import tempfile
+
+df = pd.read_json(r'''{df_json}''')
+
+{user_code}
+
+fig = plt.gcf()
+if fig and fig.axes:
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    fig.savefig(tmp.name, format="png", bbox_inches="tight")
+    plt.close(fig)
+    print(tmp.name)
+else:
+    print("")
+"""
+    script_code = PLOT_SCRIPT_TEMPLATE.format(df_json=df_json, user_code=code)
+    
+    script_tmp = tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8")
+    script_tmp.write(script_code)
+    script_tmp.close()
+    
+    png_path = None
+    try:
+        result = subprocess.run([sys.executable, script_tmp.name], capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError(f"Sandbox error: {result.stderr}")
+            
+        png_path = result.stdout.strip()
+        if png_path and os.path.exists(png_path):
+            with open(png_path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+        return None
+    except subprocess.TimeoutExpired:
+        logger.warning("Plot sandbox timed out")
+        return None
+    except Exception as e:
+        logger.error("Plot sandbox failed: %s", e, exc_info=True)
+        return None
+    finally:
+        if os.path.exists(script_tmp.name):
+            try:
+                os.remove(script_tmp.name)
+            except Exception:
+                pass
+        if png_path and os.path.exists(png_path):
+            try:
+                os.remove(png_path)
+            except Exception:
+                pass
+

@@ -4,6 +4,8 @@ import Layout from './pages/Layout';
 import HomePage from './pages/HomePage';
 import ConfigurePage from './pages/ConfigurePage';
 import ResultsPage from './pages/ResultsPage';
+import AuthPage from './pages/AuthPage';
+import ProtectedRoute from './components/ProtectedRoute';
 import type { DatasetInfo, AnalyzeResponse } from './services/api';
 
 function App() {
@@ -15,7 +17,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<Layout sessionId={sessionId} hasResults={!!result} />}>
+        {/* Auth — public route */}
+        <Route path="/auth" element={<AuthPage />} />
+
+        {/* Protected routes */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout sessionId={sessionId} hasResults={!!result} />
+            </ProtectedRoute>
+          }
+        >
           {/* Home — always shows 3D robot + upload */}
           <Route
             path="/"

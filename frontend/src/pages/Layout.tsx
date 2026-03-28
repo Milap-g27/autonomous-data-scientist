@@ -1,7 +1,9 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Home, Settings2, BarChart2, Bot } from 'lucide-react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Settings2, BarChart2, Bot, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import ChatPanel from '../features/chat/components/ChatPanel';
+import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/context/AuthContext';
 
 interface Props {
   sessionId: string;
@@ -10,7 +12,15 @@ interface Props {
 
 export default function Layout({ sessionId, hasResults }: Props) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [chatOpen, setChatOpen] = useState(false);
+  const { signOut } = useAuth();
+  const { user } = useAuthContext();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   const navItems = [
     { to: '/', label: 'Home', icon: Home },
@@ -60,6 +70,23 @@ export default function Layout({ sessionId, hasResults }: Props) {
             {!sessionId ? 'IDLE' : hasResults ? 'COMPLETE' : 'ACTIVE'}
           </span>
         </div>
+
+        {/* User + Sign Out */}
+        {user && (
+          <div className="flex items-center gap-3 ml-3">
+            <span className="text-[11px] text-neutral-500 hidden md:inline">
+              {user.displayName || user.email}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-neutral-500 hover:text-red-400 hover:bg-neutral-900 rounded-lg transition-all text-xs"
+              title="Sign out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Sign Out</span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}

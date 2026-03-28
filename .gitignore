@@ -32,3 +32,12 @@ Thumbs.db
 .pytest_cache/
 catboost_info/
 .venv_old_*/
+
+# Secrets
+backend/service-account.json
+backend/*service-account*.json
+!backend/service-account.example.json
+frontend/.env
+frontend/.env.*
+backend/.env
+backend/.env.*

@@ -48,11 +48,16 @@ async def train_models_node(state: AgentState) -> dict:
     
     models = await asyncio.to_thread(train_models, X_train, y_train, problem_type)
     
-    return {"models": models}
+    return {
+        "models": models,
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train": y_train,
+        "y_test": y_test
+    }
 
 async def evaluate_models_node(state: AgentState) -> dict:
     X = state['X']
-    y = state.get('y')
     models = state['models']
     problem_type = state['problem_type']
     
@@ -61,8 +66,11 @@ async def evaluate_models_node(state: AgentState) -> dict:
         metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X, None, problem_type)
         return {"metrics": metrics, "model_name": best_model_name}
     
-    # Re-split to get the same test set
-    _, X_test, _, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_test = state.get('X_test')
+    y_test = state.get('y_test')
+    
+    if X_test is None or y_test is None:
+        raise ValueError("X_test/y_test missing from state. Ensure train_models_node ran first.")
     
     metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X_test, y_test, problem_type)
     

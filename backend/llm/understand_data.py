@@ -1,4 +1,7 @@
+import logging
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from config import settings
@@ -54,7 +57,7 @@ async def understand_data_node(state: dict) -> dict:
                 problem_type = "Classification"
                 
     except Exception as e:
-        print(f"Error in understand_data: {e}")
+        logger.warning("Error in understand_data, using heuristic fallback: %s", e, exc_info=True)
         # Heuristic fallback
         if pd.api.types.is_numeric_dtype(df[target]) and df[target].nunique() > 10:
             problem_type = "Regression"

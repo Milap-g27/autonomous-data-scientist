@@ -17,3 +17,4 @@ catboost
 python-dotenv
 tabulate
 pydantic-settings
+firebase-admin

@@ -1,5 +1,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
+// ── Auth Token Injection ──
+
+type TokenGetter = () => Promise<string | null>;
+let _getAuthToken: TokenGetter = async () => null;
+
+export function setAuthTokenGetter(getter: TokenGetter) {
+  _getAuthToken = getter;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await _getAuthToken();
+  if (token) return { Authorization: `Bearer ${token}` };
+  return {};
+}
+
 // ── Types ──
 
 export interface DatasetInfo {
@@ -63,7 +78,11 @@ export interface ChatResponse {
 export async function uploadDataset(file: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
+  const res = await fetch(`${API_BASE}/upload`, {
+    method: "POST",
+    headers: { ...(await authHeaders()) },
+    body: form,
+  });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
   return res.json();
 }
@@ -71,7 +90,7 @@ export async function uploadDataset(file: File): Promise<UploadResponse> {
 export async function configureSession(cfg: ConfigureRequest): Promise<unknown> {
   const res = await fetch(`${API_BASE}/configure`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(cfg),
   });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
@@ -81,7 +100,7 @@ export async function configureSession(cfg: ConfigureRequest): Promise<unknown> 
 export async function analyzeSession(sessionId: string): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ session_id: sessionId }),
   });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
@@ -94,7 +113,7 @@ export async function predictWithModel(
 ): Promise<PredictResponse> {
   const res = await fetch(`${API_BASE}/predict`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ session_id: sessionId, input_data: inputData }),
   });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
@@ -107,7 +126,7 @@ export async function chatWithAssistant(
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ session_id: sessionId, message }),
   });
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
