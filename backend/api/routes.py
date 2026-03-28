@@ -642,6 +642,19 @@ def _run_plot_code_sandboxed(code: str, df_json: str) -> str:
     import base64
     import sys
     encoded_df_json = base64.b64encode(df_json.encode("utf-8")).decode("utf-8")
+    memory_limit_mb = int(getattr(settings, "PLOT_SANDBOX_MEMORY_MB", 0) or 0)
+    if memory_limit_mb > 0:
+        memory_limit_code = (
+            "try:\n"
+            "    import resource\n"
+            f"    _limit = {memory_limit_mb} * 1024 * 1024\n"
+            "    resource.setrlimit(resource.RLIMIT_AS, (_limit, _limit))\n"
+            "except Exception:\n"
+            "    pass\n"
+        )
+    else:
+        memory_limit_code = ""
+
     PLOT_SCRIPT_TEMPLATE = """
 import pandas as pd
 import matplotlib
@@ -653,11 +666,7 @@ import base64
 import sys, os
 import tempfile
 
-try:
-    import resource
-    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
-except Exception:
-    pass
+{memory_limit_code}
 
 data_json = base64.b64decode("{df_json_b64}").decode("utf-8")
 df = pd.read_json(io.StringIO(data_json))
@@ -673,7 +682,11 @@ if fig and fig.axes:
 else:
     print("")
 """
-    script_code = PLOT_SCRIPT_TEMPLATE.format(df_json_b64=encoded_df_json, user_code=code)
+    script_code = PLOT_SCRIPT_TEMPLATE.format(
+        df_json_b64=encoded_df_json,
+        user_code=code,
+        memory_limit_code=memory_limit_code,
+    )
     
     script_tmp = tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8")
     script_tmp.write(script_code)
