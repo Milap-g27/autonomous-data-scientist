@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None
+    PLOT_DEBUG: bool = False
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     CORS_ORIGINS: str = "*"

@@ -71,6 +71,13 @@ export interface PredictResponse {
 export interface ChatResponse {
   reply: string;
   image_base64?: string;
+  plot_diagnostics?: {
+    rows: number;
+    columns: number;
+    code_length: number;
+    sandbox_duration_ms: number;
+    error?: string;
+  };
 }
 
 // ── API Client ──

@@ -90,9 +90,18 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class PlotDiagnostics(BaseModel):
+    rows: int
+    columns: int
+    code_length: int
+    sandbox_duration_ms: int
+    error: Optional[str] = None
+
+
 class ChatResponse(BaseModel):
     reply: str
     image_base64: Optional[str] = None
+    plot_diagnostics: Optional[PlotDiagnostics] = None
 
 
 # ── Task / Status ──────────────────────────

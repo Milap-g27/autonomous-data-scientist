@@ -32,7 +32,7 @@ from api.schemas import (
     ConfigureRequest, ConfigureResponse,
     AnalyzeRequest, AnalyzeResponse, FigureData,
     PredictRequest, PredictResponse,
-    ChatRequest, ChatResponse,
+    ChatRequest, ChatResponse, PlotDiagnostics,
     HealthResponse,
 )
 from api.session import store, Session
@@ -263,11 +263,11 @@ async def chat(req: ChatRequest):
     if not api_key:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured.")
 
-    reply, image_base64 = await _get_chat_response(session, req.message, api_key)
-    return ChatResponse(reply=reply, image_base64=image_base64)
+    reply, image_base64, plot_diagnostics = await _get_chat_response(session, req.message, api_key)
+    return ChatResponse(reply=reply, image_base64=image_base64, plot_diagnostics=plot_diagnostics)
 
 
-async def _get_chat_response(session: Session, user_message: str, api_key: str) -> tuple[str, str | None]:
+async def _get_chat_response(session: Session, user_message: str, api_key: str) -> tuple[str, str | None, PlotDiagnostics | None]:
     """Call ChatGroq asynchronously with session context."""
     from langchain_groq import ChatGroq
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
@@ -421,9 +421,11 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
 
         # Plot Interception Logic
         image_base64 = None
+        plot_diagnostics: PlotDiagnostics | None = None
         
         # New XML-based robust tag extraction
         if "<PLOT>" in reply and "</PLOT>" in reply:
+            code_to_run = ""
             try:
                 start_idx = reply.find("<PLOT>") + len("<PLOT>")
                 end_idx = reply.find("</PLOT>")
@@ -433,8 +435,17 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                 if code_to_run.startswith("```python"): code_to_run = code_to_run[9:].strip()
                 elif code_to_run.startswith("```"): code_to_run = code_to_run[3:].strip()
                 if code_to_run.endswith("```"): code_to_run = code_to_run[:-3].strip()
-                
+
+                sandbox_start = time.perf_counter()
                 image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
+                sandbox_duration_ms = int((time.perf_counter() - sandbox_start) * 1000)
+                if settings.PLOT_DEBUG:
+                    plot_diagnostics = PlotDiagnostics(
+                        rows=int(session.df.shape[0]),
+                        columns=int(session.df.shape[1]),
+                        code_length=len(code_to_run),
+                        sandbox_duration_ms=sandbox_duration_ms,
+                    )
                 if not image_base64:
                     raise RuntimeError("Plot code executed but no image was produced.")
                 
@@ -442,6 +453,14 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                 full_tag_block = reply[reply.find("<PLOT>"):end_idx + len("</PLOT>")]
                 reply = reply.replace(full_tag_block, "\n*Here is the plot you requested:*\n")
             except Exception as e:
+                if settings.PLOT_DEBUG and session.df is not None:
+                    plot_diagnostics = PlotDiagnostics(
+                        rows=int(session.df.shape[0]),
+                        columns=int(session.df.shape[1]),
+                        code_length=len(code_to_run),
+                        sandbox_duration_ms=0,
+                        error=str(e),
+                    )
                 logger.error("Plot execution failed: %s", e, exc_info=True)
                 reply += f"\n\n*(Note: Failed to generate plot: {e})*"
         # Fallback for older generations if it still uses # PLOT
@@ -456,12 +475,29 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                     code_to_run = code_to_run.replace("# PLOT", "", 1).strip()
 
                 try:
+                    sandbox_start = time.perf_counter()
                     image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
+                    sandbox_duration_ms = int((time.perf_counter() - sandbox_start) * 1000)
+                    if settings.PLOT_DEBUG:
+                        plot_diagnostics = PlotDiagnostics(
+                            rows=int(session.df.shape[0]),
+                            columns=int(session.df.shape[1]),
+                            code_length=len(code_to_run),
+                            sandbox_duration_ms=sandbox_duration_ms,
+                        )
                     if not image_base64:
                         raise RuntimeError("Plot code executed but no image was produced.")
                     
                     reply = reply.replace(match.group(0), "\n*Here is the plot you requested:*\n")
                 except Exception as e:
+                    if settings.PLOT_DEBUG and session.df is not None:
+                        plot_diagnostics = PlotDiagnostics(
+                            rows=int(session.df.shape[0]),
+                            columns=int(session.df.shape[1]),
+                            code_length=len(code_to_run),
+                            sandbox_duration_ms=0,
+                            error=str(e),
+                        )
                     logger.error("Plot execution failed: %s", e, exc_info=True)
                     reply += f"\n\n*(Note: Failed to generate plot: {e})*"
 
@@ -469,10 +505,10 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
         session.chat_history.append({"role": "user", "content": user_message})
         session.chat_history.append({"role": "assistant", "content": reply})
 
-        return reply, image_base64
+        return reply, image_base64, plot_diagnostics
 
     except Exception as e:
-        return f"Error: {e}", None
+        return f"Error: {e}", None, None
 
 
 # ── Sessions management ────────────────────
@@ -517,16 +553,20 @@ def _make_json_safe(obj: Any) -> Any:
 def _run_plot_code_sandboxed(code: str, df_json: str) -> str:
     import base64
     import sys
+    encoded_df_json = base64.b64encode(df_json.encode("utf-8")).decode("utf-8")
     PLOT_SCRIPT_TEMPLATE = """
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
+import io
+import base64
 import sys, os
 import tempfile
 
-df = pd.read_json(r'''{df_json}''')
+data_json = base64.b64decode("{df_json_b64}").decode("utf-8")
+df = pd.read_json(io.StringIO(data_json))
 
 {user_code}
 
@@ -539,7 +579,7 @@ if fig and fig.axes:
 else:
     print("")
 """
-    script_code = PLOT_SCRIPT_TEMPLATE.format(df_json=df_json, user_code=code)
+    script_code = PLOT_SCRIPT_TEMPLATE.format(df_json_b64=encoded_df_json, user_code=code)
     
     script_tmp = tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8")
     script_tmp.write(script_code)
