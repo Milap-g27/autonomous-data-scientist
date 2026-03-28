@@ -52,6 +52,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
 if settings.RATE_LIMIT_ENABLED:
     app.add_middleware(SlowAPIMiddleware)
 
@@ -61,7 +62,6 @@ if settings.RATE_LIMIT_ENABLED:
             status_code=429,
             content={"detail": "Rate limit exceeded. Please try again later."},
         )
-
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
@@ -78,7 +78,7 @@ async def request_id_middleware(request: Request, call_next):
     )
     return response
 
-# ── CORS ──
+# ── CORS ── (added LAST so it runs FIRST/outermost, handling OPTIONS before rate limiting)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
