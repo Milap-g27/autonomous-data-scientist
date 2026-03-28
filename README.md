@@ -141,7 +141,9 @@ The app is deployed as **two services**:
 3. Connect your GitHub repo and point the root directory to `backend/`.
 4. Set environment variables in the Render dashboard:
    - `GROQ_API_KEY` — your Groq API key
-   - `CORS_ORIGINS` — your Frontend URL (e.g. `https://your-app.vercel.app`)
+   - `CORS_ORIGINS` — comma-separated allowed origins (e.g. `https://your-app.vercel.app,https://your-custom-domain.com`)
+   - `FIREBASE_SERVICE_ACCOUNT_JSON` — full JSON string for Firebase Admin service account (recommended in production)
+   - `FIREBASE_SERVICE_ACCOUNT_PATH` — leave empty in production unless you mount a file
    - `OPENAI_API_KEY` — optional, if you switch LLM providers
 5. Deploy. Your API will be live at `https://<service-name>.onrender.com`.
 
@@ -152,17 +154,35 @@ The app is deployed as **two services**:
 3. Configure the Root Directory to `frontend`.
 4. Add Environment Variables:
    ```
-   VITE_API_URL = "https://<your-render-service>.onrender.com/api"
+   VITE_API_BASE = "https://<your-render-service>.onrender.com/api"
+   VITE_FIREBASE_API_KEY = "..."
+   VITE_FIREBASE_AUTH_DOMAIN = "<your-project>.firebaseapp.com"
+   VITE_FIREBASE_PROJECT_ID = "<your-project>"
+   VITE_FIREBASE_STORAGE_BUCKET = "<your-project>.appspot.com"
+   VITE_FIREBASE_MESSAGING_SENDER_ID = "..."
+   VITE_FIREBASE_APP_ID = "..."
+   VITE_FIREBASE_MEASUREMENT_ID = "..."  # optional
    ```
 5. Click **Deploy**. Your UI will be live at `https://your-app.vercel.app`.
+
+6. In Firebase Console → Authentication → Settings → Authorized domains, add:
+   - `your-app.vercel.app`
+   - your custom frontend domain (if any)
 
 ### Environment Variables Summary
 
 | Variable | Where | Value |
 |----------|-------|-------|
 | `GROQ_API_KEY` | Render (backend) | Your Groq API key |
-| `CORS_ORIGINS` | Render (backend) | `https://your-app.vercel.app` |
-| `VITE_API_URL` | Vercel (frontend) | `https://<render-service>.onrender.com/api` |
+| `CORS_ORIGINS` | Render (backend) | `https://your-app.vercel.app,https://your-custom-domain.com` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Render (backend) | Full service-account JSON string |
+| `VITE_API_BASE` | Vercel (frontend) | `https://<render-service>.onrender.com/api` |
+| `VITE_FIREBASE_API_KEY` | Vercel (frontend) | Firebase web app API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Vercel (frontend) | `<your-project>.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | Vercel (frontend) | Firebase project id |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Vercel (frontend) | `<your-project>.appspot.com` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Vercel (frontend) | Firebase sender id |
+| `VITE_FIREBASE_APP_ID` | Vercel (frontend) | Firebase app id |
 
 ---
 
