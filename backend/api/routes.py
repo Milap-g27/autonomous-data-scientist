@@ -451,7 +451,7 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                 
                 # Remove the raw code block from the user's view
                 full_tag_block = reply[reply.find("<PLOT>"):end_idx + len("</PLOT>")]
-                reply = reply.replace(full_tag_block, "\n*Here is the plot you requested:*\n")
+                reply = reply.replace(full_tag_block, "\nHere is the plot you requested:\n")
             except Exception as e:
                 if settings.PLOT_DEBUG and session.df is not None:
                     plot_diagnostics = PlotDiagnostics(
@@ -462,7 +462,7 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                         error=str(e),
                     )
                 logger.error("Plot execution failed: %s", e, exc_info=True)
-                reply += f"\n\n*(Note: Failed to generate plot: {e})*"
+                reply += f"\n\nNote: Failed to generate plot: {e}"
         # Fallback for older generations if it still uses # PLOT
         elif "# PLOT" in reply and image_base64 is None:
             match = re.search(r"```(?:python)?\s*# PLOT\s*(.*?)\n```", reply, re.DOTALL)
@@ -488,7 +488,7 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                     if not image_base64:
                         raise RuntimeError("Plot code executed but no image was produced.")
                     
-                    reply = reply.replace(match.group(0), "\n*Here is the plot you requested:*\n")
+                    reply = reply.replace(match.group(0), "\nHere is the plot you requested:\n")
                 except Exception as e:
                     if settings.PLOT_DEBUG and session.df is not None:
                         plot_diagnostics = PlotDiagnostics(
@@ -499,7 +499,7 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                             error=str(e),
                         )
                     logger.error("Plot execution failed: %s", e, exc_info=True)
-                    reply += f"\n\n*(Note: Failed to generate plot: {e})*"
+                    reply += f"\n\nNote: Failed to generate plot: {e}"
 
         # Persist history
         session.chat_history.append({"role": "user", "content": user_message})
