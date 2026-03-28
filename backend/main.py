@@ -35,8 +35,12 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
+try:
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+except ModuleNotFoundError:
+    RateLimitExceeded = None
+    SlowAPIMiddleware = None
 
 from config import settings
 from api.routes import router
@@ -51,9 +55,11 @@ app = FastAPI(
     version="2.0.0",
 )
 
+logger = logging.getLogger(__name__)
+
 app.state.limiter = limiter
 
-if settings.RATE_LIMIT_ENABLED:
+if settings.RATE_LIMIT_ENABLED and SlowAPIMiddleware is not None:
     app.add_middleware(SlowAPIMiddleware)
 
     @app.exception_handler(RateLimitExceeded)
@@ -62,6 +68,8 @@ if settings.RATE_LIMIT_ENABLED:
             status_code=429,
             content={"detail": "Rate limit exceeded. Please try again later."},
         )
+elif settings.RATE_LIMIT_ENABLED:
+    logger.warning("slowapi is not installed; running without rate limiting.")
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):

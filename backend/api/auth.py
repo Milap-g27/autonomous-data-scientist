@@ -31,30 +31,32 @@ def _init_firebase():
     sa_path = settings.FIREBASE_SERVICE_ACCOUNT_PATH
     sa_json = settings.FIREBASE_SERVICE_ACCOUNT_JSON
 
+    # Try path first (if provided), then JSON (if provided), then ADC.
     if sa_path:
         try:
             cred = credentials.Certificate(sa_path)
             _firebase_app = firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin initialized from service account path")
+            return
         except Exception as e:
-            logger.error("Failed to initialize Firebase Admin from path: %s", e, exc_info=True)
-            raise
-    elif sa_json:
+            logger.warning("Failed to initialize Firebase Admin from path: %s", e)
+
+    if sa_json and _firebase_app is None:
         try:
             sa_dict = json.loads(sa_json)
             cred = credentials.Certificate(sa_dict)
             _firebase_app = firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin initialized from service account JSON")
+            return
         except Exception as e:
-            logger.error("Failed to initialize Firebase Admin from JSON: %s", e, exc_info=True)
-            raise
-    else:
-        # Fall back to Application Default Credentials
-        try:
-            _firebase_app = firebase_admin.initialize_app()
-            logger.info("Firebase Admin initialized with default credentials")
-        except Exception as e:
-            logger.warning("Firebase Admin not initialized: %s", e)
+            logger.warning("Failed to initialize Firebase Admin from JSON: %s", e)
+
+    # Fall back to Application Default Credentials.
+    try:
+        _firebase_app = firebase_admin.initialize_app()
+        logger.info("Firebase Admin initialized with default credentials")
+    except Exception as e:
+        logger.warning("Firebase Admin not initialized: %s", e)
 
 
 # Initialize on module import
