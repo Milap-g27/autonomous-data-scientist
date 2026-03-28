@@ -1,21 +1,35 @@
-langgraph
-langchain
-langchain_groq
-fastapi
-uvicorn[standard]
-python-multipart
-requests
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-plotly
-xgboost
-lightgbm
-catboost
-python-dotenv
-tabulate
-pydantic-settings
-firebase-admin
-slowapi
+# ── Web Framework ─────────────────────────────
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+python-multipart==0.0.22
+
+# ── Config & Validation ───────────────────────
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-dotenv==1.2.2
+
+# ── LLM & Agent Stack ─────────────────────────
+langchain==1.2.13
+langchain-groq==1.1.2
+langgraph==1.1.3
+
+# ── Data Science ──────────────────────────────
+pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.8.0
+matplotlib==3.10.8
+seaborn==0.13.2
+plotly==6.6.0
+
+# ── ML Models ─────────────────────────────────
+xgboost==3.2.0
+lightgbm==4.6.0
+catboost==1.2.10
+
+# ── Auth & Networking ─────────────────────────
+firebase-admin==6.6.0
+requests==2.33.0
+tabulate==0.10.0
+
+# ── Rate Limiting ─────────────────────────────
+slowapi==0.1.9
