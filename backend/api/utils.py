@@ -4,15 +4,19 @@ Utility helpers for the API layer.
 import base64
 import io
 from typing import Any
-import matplotlib
-matplotlib.use("Agg")  # non-interactive backend — thread-safe
-import matplotlib.pyplot as plt
-import matplotlib.figure
+from typing import TYPE_CHECKING
 import pandas as pd
 
+if TYPE_CHECKING:
+    import matplotlib.figure
 
-def fig_to_base64(fig: matplotlib.figure.Figure) -> str:
+
+def fig_to_base64(fig: "matplotlib.figure.Figure") -> str:
     """Convert a matplotlib Figure to a base64-encoded PNG string."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
     plt.close(fig)

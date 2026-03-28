@@ -28,9 +28,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-import matplotlib
-matplotlib.use("Agg")  # non-interactive backend before any other mpl import
-
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
