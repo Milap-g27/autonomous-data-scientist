@@ -435,6 +435,8 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
                 if code_to_run.endswith("```"): code_to_run = code_to_run[:-3].strip()
                 
                 image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
+                if not image_base64:
+                    raise RuntimeError("Plot code executed but no image was produced.")
                 
                 # Remove the raw code block from the user's view
                 full_tag_block = reply[reply.find("<PLOT>"):end_idx + len("</PLOT>")]
@@ -455,6 +457,8 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
 
                 try:
                     image_base64 = _run_plot_code_sandboxed(code_to_run, session.df.head(5000).to_json())
+                    if not image_base64:
+                        raise RuntimeError("Plot code executed but no image was produced.")
                     
                     reply = reply.replace(match.group(0), "\n*Here is the plot you requested:*\n")
                 except Exception as e:
@@ -510,7 +514,7 @@ def _make_json_safe(obj: Any) -> Any:
     return obj
 
 
-def _run_plot_code_sandboxed(code: str, df_json: str) -> str | None:
+def _run_plot_code_sandboxed(code: str, df_json: str) -> str:
     import base64
     import sys
     PLOT_SCRIPT_TEMPLATE = """
@@ -543,21 +547,32 @@ else:
     
     png_path = None
     try:
-        result = subprocess.run([sys.executable, script_tmp.name], capture_output=True, text=True, timeout=15)
+        result = subprocess.run([sys.executable, script_tmp.name], capture_output=True, text=True, timeout=45)
         if result.returncode != 0:
-            raise RuntimeError(f"Sandbox error: {result.stderr}")
-            
-        png_path = result.stdout.strip()
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            raise RuntimeError(f"Sandbox error. stderr={stderr[:600]} stdout={stdout[:200]}")
+
+        stdout_lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+        for line in reversed(stdout_lines):
+            if os.path.exists(line):
+                png_path = line
+                break
+
+        if not png_path:
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            raise RuntimeError(
+                "Sandbox completed but no image path was returned. "
+                f"stderr={stderr[:400]} stdout={stdout[:200]}"
+            )
+
         if png_path and os.path.exists(png_path):
             with open(png_path, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
-        return None
+        raise RuntimeError("Sandbox returned an image path but the file was not found.")
     except subprocess.TimeoutExpired:
-        logger.warning("Plot sandbox timed out")
-        return None
-    except Exception as e:
-        logger.error("Plot sandbox failed: %s", e, exc_info=True)
-        return None
+        raise RuntimeError("Plot generation timed out after 45 seconds.")
     finally:
         if os.path.exists(script_tmp.name):
             try:
