@@ -41,8 +41,9 @@ export default function ChatPanel({ sessionId, isOpen, onClose }: Props) {
     try {
       const res = await chatWithAssistant(sessionId, userMsg);
       setMessages(prev => [...prev, { role: 'assistant', content: res.reply, image_base64: res.image_base64 }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the assistant.' }]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not reach the assistant.';
+      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${message}` }]);
     } finally {
       setLoading(false);
     }
@@ -127,6 +128,7 @@ export default function ChatPanel({ sessionId, isOpen, onClose }: Props) {
       {/* Input */}
       <div className="px-4 py-3 border-t border-white/10 bg-neutral-900/30">
         <div className="flex items-center gap-2">
+          <div className="flex-1">
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -138,8 +140,13 @@ export default function ChatPanel({ sessionId, isOpen, onClose }: Props) {
             }}
             placeholder="Ask about your data or models…"
             rows={isExpanded ? 3 : 2}
+            maxLength={4000}
             className="flex-1 bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors resize-none overflow-y-auto"
           />
+            <div className="mt-1 text-right text-[10px] text-neutral-500">
+              {input.length}/4000
+            </div>
+          </div>
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}

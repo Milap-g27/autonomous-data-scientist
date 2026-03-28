@@ -15,6 +15,7 @@ class Session:
     __slots__ = (
         "id", "created_at", "df", "config", "result",
         "chat_history", "task_status", "task_error",
+        "owner_uid",
     )
 
     def __init__(self, session_id: str):
@@ -26,6 +27,7 @@ class Session:
         self.chat_history: List[Dict[str, str]] = []
         self.task_status: str = "idle"     # idle | running | completed | failed
         self.task_error: Optional[str] = None
+        self.owner_uid: Optional[str] = None
 
 
 class SessionStore:
@@ -53,6 +55,14 @@ class SessionStore:
     async def list_ids(self) -> List[str]:
         async with self._lock:
             return list(self._sessions.keys())
+
+    async def list_ids_for_owner(self, owner_uid: str) -> List[str]:
+        async with self._lock:
+            return [
+                s_id
+                for s_id, session in self._sessions.items()
+                if session.owner_uid == owner_uid
+            ]
 
 
 # Global singleton — shared across the app via dependency injection

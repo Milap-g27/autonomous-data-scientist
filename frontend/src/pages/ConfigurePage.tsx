@@ -1,7 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { Play, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
-import { configureSession, analyzeSession, type DatasetInfo, type AnalyzeResponse } from '../services/api';
+import { useEffect, useRef, useState } from 'react';
+import {
+  configureSession,
+  analyzeSession,
+  getAnalysisStatus,
+  getAnalysisResult,
+  type DatasetInfo,
+  type AnalyzeResponse,
+} from '../services/api';
 
 interface Props {
   sessionId: string;
@@ -20,10 +27,19 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleRun = async () => {
     setError('');
     setRunning(true);
+    setElapsedSeconds(0);
     try {
       await configureSession({
         session_id: sessionId,
@@ -34,12 +50,38 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
         scaling,
         feature_selection: false,
       });
-      const res = await analyzeSession(sessionId);
-      onAnalysisComplete(res, target);
-      navigate('/results');
+
+      await analyzeSession(sessionId);
+
+      const pollStart = Date.now();
+      const timeoutMs = 12 * 60 * 1000;
+      while (true) {
+        const status = await getAnalysisStatus(sessionId);
+        const elapsed = Math.floor((Date.now() - pollStart) / 1000);
+        if (isMountedRef.current) setElapsedSeconds(elapsed);
+
+        if (status.status === 'completed') {
+          const res = await getAnalysisResult(sessionId);
+          onAnalysisComplete(res, target);
+          navigate('/results');
+          return;
+        }
+
+        if (status.status === 'failed') {
+          throw new Error(status.error || 'Analysis failed during processing.');
+        }
+
+        if (Date.now() - pollStart > timeoutMs) {
+          throw new Error('Analysis is taking longer than expected. Please try again shortly.');
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
-      setRunning(false);
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+        setRunning(false);
+      }
     }
   };
 
@@ -55,6 +97,7 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
         </div>
         <p className="text-neutral-400 text-sm font-medium">Agent is working — analyzing, modeling, explaining…</p>
         <p className="text-neutral-600 text-xs">This may take a few minutes depending on dataset size.</p>
+        <p className="text-neutral-500 text-xs">Elapsed: {elapsedSeconds}s</p>
         <div className="flex gap-1 mt-4">
           {['Cleaning', 'EDA', 'Feature Eng.', 'Training', 'Evaluation'].map((step, i) => (
             <span key={step} className="px-3 py-1.5 bg-neutral-900 border border-white/5 rounded-full text-[10px] text-neutral-500 animate-pulse" style={{ animationDelay: `${i * 200}ms` }}>

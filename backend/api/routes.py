@@ -25,21 +25,98 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks, Request
 
 from api.schemas import (
     UploadResponse, DatasetInfo,
     ConfigureRequest, ConfigureResponse,
-    AnalyzeRequest, AnalyzeResponse, FigureData,
+    AnalyzeRequest, AnalyzeResponse, AnalyzeStartResponse, SessionStatusResponse, FigureData,
     PredictRequest, PredictResponse,
     ChatRequest, ChatResponse, PlotDiagnostics,
     HealthResponse,
 )
 from api.session import store, Session
-from api.utils import fig_to_base64, build_dataset_summary
+from api.auth import verify_firebase_token
+from api.utils import fig_to_base64, build_dataset_summary, make_json_safe
 from config import settings
+from limiter import limiter
 
 router = APIRouter()
+
+
+def _enforce_session_access(session: Session, uid: str) -> None:
+    if session.owner_uid is None:
+        session.owner_uid = uid
+        return
+    if session.owner_uid != uid:
+        raise HTTPException(status_code=403, detail="Forbidden: session does not belong to this user.")
+
+
+async def _run_analysis_task(session_id: str) -> None:
+    session = await store.get(session_id)
+    if not session:
+        return
+
+    try:
+        from core.agent_graph import build_graph
+
+        session.task_status = "running"
+        session.task_error = None
+        start_time = time.time()
+
+        graph = build_graph()
+        initial_state = {
+            "df": session.df,
+            "target": session.config.get("target"),
+        }
+
+        result = await graph.ainvoke(initial_state)  # type: ignore[arg-type]
+        elapsed = round(time.time() - start_time, 1)
+        if isinstance(result, dict):
+            result["_training_time_sec"] = elapsed
+        session.result = result
+        session.task_status = "completed"
+        session.task_error = None
+    except Exception:
+        session.task_status = "failed"
+        session.task_error = traceback.format_exc()
+
+
+async def _build_analyze_response(session: Session) -> AnalyzeResponse:
+    if not session.result:
+        raise HTTPException(status_code=400, detail="No analysis results. Run /analyze first.")
+
+    result = session.result
+
+    figures_out: list[FigureData] = []
+    for item in result.get("eda_figures", []):
+        if isinstance(item, dict):
+            fig = item.get("figure")
+            if fig is not None:
+                figures_out.append(FigureData(
+                    heading=item.get("heading", ""),
+                    description=item.get("description", ""),
+                    image_base64=await asyncio.to_thread(fig_to_base64, fig),
+                ))
+
+    raw_metrics = result.get("metrics", {})
+    safe_metrics = make_json_safe(raw_metrics)
+
+    raw_eda = result.get("eda_results", {})
+    safe_eda = make_json_safe(raw_eda)
+
+    return AnalyzeResponse(
+        session_id=session.id,
+        problem_type=result.get("problem_type", ""),
+        best_model=result.get("model_name", ""),
+        metrics=safe_metrics,
+        eda_results=safe_eda,
+        eda_figures=figures_out,
+        explanation=result.get("explanation", ""),
+        cleaning_report=result.get("cleaning_report", ""),
+        feature_report=result.get("feature_report", ""),
+        training_time=float(result.get("_training_time_sec", 0.0)),
+    )
 
 
 # ── Health ──────────────────────────────────
@@ -52,7 +129,8 @@ async def health():
 # ── Upload ──────────────────────────────────
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_dataset(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def upload_dataset(request: Request, file: UploadFile = File(...)):
     """Upload a CSV file, parse it, and return a new session."""
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are supported.")
@@ -82,11 +160,18 @@ async def upload_dataset(file: UploadFile = File(...)):
 # ── Configure ──────────────────────────────
 
 @router.post("/configure", response_model=ConfigureResponse)
-async def configure(req: ConfigureRequest):
+async def configure(
+    req: ConfigureRequest,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
     """Save analysis configuration to the session."""
     session = await store.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
     if session.df is None:
         raise HTTPException(status_code=400, detail="No dataset uploaded in this session.")
 
@@ -102,85 +187,89 @@ async def configure(req: ConfigureRequest):
 
 # ── Analyze ─────────────────────────────────
 
-@router.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(req: AnalyzeRequest):
-    """Run the full async LangGraph pipeline and return results."""
+@router.post("/analyze", response_model=AnalyzeStartResponse)
+@limiter.limit("5/minute")
+async def analyze(
+    request: Request,
+    req: AnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
+    """Start the async LangGraph pipeline in the background and return immediately."""
     session = await store.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
     if session.df is None:
         raise HTTPException(status_code=400, detail="No dataset uploaded in this session.")
-    if not session.config:
+    if not session.config or "target" not in session.config:
         raise HTTPException(status_code=400, detail="Configuration not set. Call /configure first.")
     if session.task_status == "running":
         raise HTTPException(status_code=409, detail="Analysis already running for this session.")
 
     session.task_status = "running"
     session.task_error = None
+    background_tasks.add_task(_run_analysis_task, session.id)
 
-    try:
-        from core.agent_graph import build_graph
-
-        start_time = time.time()
-        graph = build_graph()
-        initial_state = {
-            "df": session.df,
-            "target": session.config.get("target"),
-        }
-
-        result = await graph.ainvoke(initial_state)  # type: ignore[arg-type]
-        elapsed = round(time.time() - start_time, 1)
-
-        session.result = result
-        session.task_status = "completed"
-
-        # Serialize EDA figures to base64
-        figures_out: list[FigureData] = []
-        for item in result.get("eda_figures", []):
-            if isinstance(item, dict):
-                fig = item.get("figure")
-                if fig is not None:
-                    figures_out.append(FigureData(
-                        heading=item.get("heading", ""),
-                        description=item.get("description", ""),
-                        image_base64=await asyncio.to_thread(fig_to_base64, fig),
-                    ))
-
-        # Build a JSON-safe metrics dict (convert numpy types)
-        raw_metrics = result.get("metrics", {})
-        safe_metrics = _make_json_safe(raw_metrics)
-
-        # Build safe eda_results
-        raw_eda = result.get("eda_results", {})
-        safe_eda = _make_json_safe(raw_eda)
-
-        return AnalyzeResponse(
-            session_id=session.id,
-            problem_type=result.get("problem_type", ""),
-            best_model=result.get("model_name", ""),
-            metrics=safe_metrics,
-            eda_results=safe_eda,
-            eda_figures=figures_out,
-            explanation=result.get("explanation", ""),
-            cleaning_report=result.get("cleaning_report", ""),
-            feature_report=result.get("feature_report", ""),
-            training_time=elapsed,
-        )
-
-    except Exception as exc:
-        session.task_status = "failed"
-        session.task_error = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}")
+    return AnalyzeStartResponse(session_id=session.id, status="started")
 
 
 # ── Predict ─────────────────────────────────
 
+@router.get("/status/{session_id}", response_model=SessionStatusResponse)
+async def get_status(
+    session_id: str,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
+    session = await store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
+    return SessionStatusResponse(status=session.task_status, error=session.task_error)
+
+
+@router.get("/results/{session_id}", response_model=AnalyzeResponse)
+async def get_analysis_result(
+    session_id: str,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
+    session = await store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
+
+    if session.task_status == "running":
+        raise HTTPException(status_code=409, detail="Analysis is still running.")
+    if session.task_status == "failed":
+        raise HTTPException(status_code=500, detail=session.task_error or "Analysis failed.")
+    if session.task_status != "completed":
+        raise HTTPException(status_code=400, detail="Analysis has not completed yet.")
+
+    return await _build_analyze_response(session)
+
+
 @router.post("/predict", response_model=PredictResponse)
-async def predict(req: PredictRequest):
+async def predict(
+    req: PredictRequest,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
     """Run a single prediction using the best trained model."""
     session = await store.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
 
     result = session.result
     if not result:
@@ -242,7 +331,7 @@ async def predict(req: PredictRequest):
             predicted_value = le.inverse_transform([int(predicted_value)])[0]
 
         return PredictResponse(
-            predicted_value=_make_json_safe(predicted_value),
+            predicted_value=make_json_safe(predicted_value),
             model_used=best_model_name,
         )
 
@@ -253,11 +342,20 @@ async def predict(req: PredictRequest):
 # ── Chat ────────────────────────────────────
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+@limiter.limit("30/minute")
+async def chat(
+    request: Request,
+    req: ChatRequest,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
     """Async AI chatbot scoped to the session's dataset/model context."""
     session = await store.get(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
 
     api_key = settings.GROQ_API_KEY
     if not api_key:
@@ -514,40 +612,30 @@ If the question is COMPLETELY UNRELATED to data science or this dataset, respond
 # ── Sessions management ────────────────────
 
 @router.get("/sessions")
-async def list_sessions():
-    ids = await store.list_ids()
+async def list_sessions(decoded_token: dict = Depends(verify_firebase_token)):
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    ids = await store.list_ids_for_owner(uid)
     return {"sessions": ids}
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(
+    session_id: str,
+    decoded_token: dict = Depends(verify_firebase_token),
+):
+    session = await store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    uid = str(decoded_token.get("uid", ""))
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
+    _enforce_session_access(session, uid)
     deleted = await store.delete(session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"message": "Session deleted."}
-
-
-# ── Helpers ─────────────────────────────────
-
-def _make_json_safe(obj: Any) -> Any:
-    """Recursively convert numpy / pandas types to native Python types."""
-    import numpy as np
-
-    if isinstance(obj, dict):
-        return {k: _make_json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_make_json_safe(v) for v in obj]
-    if isinstance(obj, (np.integer,)):
-        return int(obj)
-    if isinstance(obj, (np.floating,)):
-        return float(obj)
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, (pd.Timestamp,)):
-        return obj.isoformat()
-    if isinstance(obj, (np.bool_,)):
-        return bool(obj)
-    return obj
 
 
 def _run_plot_code_sandboxed(code: str, df_json: str) -> str:
@@ -564,6 +652,12 @@ import io
 import base64
 import sys, os
 import tempfile
+
+try:
+    import resource
+    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+except Exception:
+    pass
 
 data_json = base64.b64decode("{df_json_b64}").decode("utf-8")
 df = pd.read_json(io.StringIO(data_json))
