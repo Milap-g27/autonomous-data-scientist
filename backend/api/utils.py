@@ -13,12 +13,14 @@ if TYPE_CHECKING:
 
 def fig_to_base64(fig: "matplotlib.figure.Figure") -> str:
     """Convert a matplotlib Figure to a base64-encoded PNG string."""
-    import matplotlib
-    matplotlib.use("Agg")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
     import matplotlib.pyplot as plt
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+    # Rebind to Agg canvas to avoid GUI backend interactions in worker threads.
+    canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    canvas.print_png(buf)
     plt.close(fig)
     buf.seek(0)
     return base64.b64encode(buf.read()).decode("utf-8")

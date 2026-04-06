@@ -17,6 +17,11 @@ Run:
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_core")
+warnings.filterwarnings(
+    "ignore",
+    message=r"Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater\\.",
+    category=UserWarning,
+)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 

@@ -9,7 +9,8 @@ from pipeline.data_cleaning import clean_data
 from pipeline.eda import perform_eda
 from pipeline.feature_engineering import perform_feature_engineering
 from pipeline.model_training import train_models
-from pipeline.model_evaluation import evaluate_models
+from pipeline.model_evaluation import evaluate_models, extract_model_best_params
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
 # Wrapper functions to match StateGraph node signature (state -> update)
@@ -58,13 +59,15 @@ async def train_models_node(state: AgentState) -> dict:
 
 async def evaluate_models_node(state: AgentState) -> dict:
     X = state['X']
+    y = state.get('y')
     models = state['models']
     problem_type = state['problem_type']
+    best_params = await asyncio.to_thread(extract_model_best_params, models)
     
     if problem_type == "Clustering":
         # Evaluate on full data, no y needed
         metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X, None, problem_type)
-        return {"metrics": metrics, "model_name": best_model_name}
+        return {"metrics": metrics, "model_name": best_model_name, "best_params": best_params}
     
     X_test = state.get('X_test')
     y_test = state.get('y_test')
@@ -73,8 +76,20 @@ async def evaluate_models_node(state: AgentState) -> dict:
         raise ValueError("X_test/y_test missing from state. Ensure train_models_node ran first.")
     
     metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X_test, y_test, problem_type)
+
+    # Refit only the selected best model on full supervised data for final inference.
+    # This keeps evaluation fair (train/test split) while maximizing prediction quality.
+    if best_model_name in models and y is not None:
+        try:
+            tuned_best = clone(models[best_model_name])
+            await asyncio.to_thread(tuned_best.fit, X, y)
+            models = dict(models)
+            models[best_model_name] = tuned_best
+        except Exception:
+            # Fallback: keep the trained split model if full-data refit fails.
+            pass
     
-    return {"metrics": metrics, "model_name": best_model_name}
+    return {"metrics": metrics, "model_name": best_model_name, "best_params": best_params, "models": models}
 
 def build_graph():
     workflow = StateGraph(AgentState)

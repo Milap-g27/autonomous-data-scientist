@@ -14,6 +14,7 @@ class AgentState(TypedDict):
     y_test: Optional[pd.Series]
     metrics: Dict[str, Any]
     model_name: str
+    best_params: Dict[str, Dict[str, Any]]
     eda_results: Dict[str, Any]
     eda_figures: List[matplotlib.figure.Figure]
     explanation: str

@@ -1,9 +1,22 @@
+import { useEffect, useMemo, useState } from 'react';
 import type { AnalyzeResponse } from '../../../services/api';
 
 interface Props { result: AnalyzeResponse; }
 
+function formatParamValue(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export default function ModelPerformanceTab({ result }: Props) {
   const metrics = result.metrics || {};
+  const bestParams = result.best_params || {};
   const bestModel = result.best_model || 'N/A';
   const problemType = result.problem_type || '';
 
@@ -18,6 +31,22 @@ export default function ModelPerformanceTab({ result }: Props) {
     const sb = Number(metrics[b]?.[scoreCol]) || 0;
     return sb - sa;
   });
+
+  const defaultModelForParams = bestModel && modelNames.includes(bestModel)
+    ? bestModel
+    : (sorted[0] || '');
+
+  const [selectedModel, setSelectedModel] = useState<string>(defaultModelForParams);
+
+  useEffect(() => {
+    setSelectedModel(defaultModelForParams);
+  }, [defaultModelForParams]);
+
+  const selectedParamEntries = useMemo(() => {
+    if (!selectedModel) return [] as [string, unknown][];
+    const params = bestParams[selectedModel] || {};
+    return Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
+  }, [bestParams, selectedModel]);
 
   const maxScore = Math.max(...sorted.map(m => Number(metrics[m]?.[scoreCol]) || 0), 1);
   const metricKeys = modelNames.length > 0 ? Object.keys(metrics[modelNames[0]]) : [];
@@ -84,6 +113,49 @@ export default function ModelPerformanceTab({ result }: Props) {
           </div>
         </div>
       )}
+
+      {/* Best Hyperparameters */}
+      <div>
+        <h3 className="text-sm font-bold text-neutral-300 uppercase tracking-widest mb-4">Best Hyperparameters</h3>
+
+        {sorted.length > 0 && (
+          <div className="mb-4 max-w-sm">
+            <label className="block text-[11px] uppercase tracking-widest text-neutral-500 mb-2">Model</label>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full rounded-lg bg-neutral-900 border border-white/10 text-neutral-200 px-3 py-2 text-sm focus:outline-none focus:border-white/30"
+            >
+              {sorted.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {selectedParamEntries.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="w-full text-xs text-left text-neutral-400">
+              <thead className="bg-neutral-900/50 text-neutral-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Parameter</th>
+                  <th className="px-4 py-3 font-medium">Best Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {selectedParamEntries.map(([key, value]) => (
+                  <tr key={key} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3 font-mono text-neutral-300">{key}</td>
+                    <td className="px-4 py-3 font-mono text-neutral-200 break-all">{formatParamValue(value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-500">No parameters available for the selected model.</p>
+        )}
+      </div>
 
 
     </div>

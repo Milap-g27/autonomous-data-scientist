@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     FIREBASE_SERVICE_ACCOUNT_PATH: Optional[str] = None
+    FIREBASE_PROJECT_ID: Optional[str] = None
     PLOT_DEBUG: bool = False
     PLOT_SANDBOX_MEMORY_MB: int = 0
     RATE_LIMIT_ENABLED: bool = True

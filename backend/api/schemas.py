@@ -62,6 +62,7 @@ class AnalyzeResponse(BaseModel):
     problem_type: str
     best_model: str
     metrics: Dict[str, Any]
+    best_params: Dict[str, Dict[str, Any]]
     eda_results: Dict[str, Any]
     eda_figures: List[FigureData]
     explanation: str

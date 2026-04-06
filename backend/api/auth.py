@@ -8,6 +8,8 @@ or defaults to Firebase Application Default Credentials.
 
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Optional
 
 import firebase_admin
@@ -21,6 +23,52 @@ logger = logging.getLogger(__name__)
 # ── Initialize Firebase Admin SDK ──
 
 _firebase_app: Optional[firebase_admin.App] = None
+
+
+def _parse_service_account_blob(blob: str) -> Optional[dict]:
+    """
+    Parse a service account payload that can be either:
+    1) pure JSON, or
+    2) env-style assignment text like: FIREBASE_SERVICE_ACCOUNT_JSON = { ... }
+    """
+    if not blob:
+        return None
+
+    raw = blob.strip()
+    candidates = [raw]
+
+    first_brace = raw.find("{")
+    last_brace = raw.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        candidates.append(raw[first_brace : last_brace + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            continue
+
+    return None
+
+
+def _resolve_project_id(sa_dict: Optional[dict] = None) -> Optional[str]:
+    explicit = settings.FIREBASE_PROJECT_ID or os.getenv("GOOGLE_CLOUD_PROJECT")
+    if explicit:
+        return explicit
+    if sa_dict and isinstance(sa_dict, dict):
+        return sa_dict.get("project_id")
+    return None
+
+
+def _initialize_app_with_cert(cert_source, sa_dict: Optional[dict] = None) -> firebase_admin.App:
+    project_id = _resolve_project_id(sa_dict)
+    cred = credentials.Certificate(cert_source)
+    if project_id:
+        logger.info("Initializing Firebase Admin with explicit projectId=%s", project_id)
+        return firebase_admin.initialize_app(cred, {"projectId": project_id})
+    return firebase_admin.initialize_app(cred)
 
 
 def _init_firebase():
@@ -37,20 +85,36 @@ def _init_firebase():
     if sa_path:
         try:
             logger.info("Attempting Firebase init from service account path: %s", sa_path)
-            cred = credentials.Certificate(sa_path)
-            _firebase_app = firebase_admin.initialize_app(cred)
+            _firebase_app = _initialize_app_with_cert(sa_path)
             logger.info("Firebase Admin initialized from service account path")
             return
         except Exception as e:
             logger.warning("Failed to initialize Firebase Admin from path: %s", e)
 
+            # Fallback: parse non-standard text content from file (env-style assignment).
+            try:
+                file_blob = Path(sa_path).read_text(encoding="utf-8")
+                sa_dict = _parse_service_account_blob(file_blob)
+                if sa_dict:
+                    logger.info(
+                        "Parsed Firebase service account file as text blob (project_id=%s)",
+                        sa_dict.get("project_id"),
+                    )
+                    _firebase_app = _initialize_app_with_cert(sa_dict, sa_dict)
+                    logger.info("Firebase Admin initialized from parsed service account file content")
+                    return
+                logger.warning("Service account file did not contain parseable JSON content")
+            except Exception as parse_file_err:
+                logger.warning("Failed to parse service account file content: %s", parse_file_err)
+
     if sa_json and _firebase_app is None:
         try:
             logger.info("Attempting Firebase init from service account JSON (length=%d)", len(sa_json))
-            sa_dict = json.loads(sa_json)
+            sa_dict = _parse_service_account_blob(sa_json)
+            if not sa_dict:
+                raise json.JSONDecodeError("Invalid JSON payload", sa_json, 0)
             logger.info("Successfully parsed service account JSON (project_id=%s)", sa_dict.get("project_id"))
-            cred = credentials.Certificate(sa_dict)
-            _firebase_app = firebase_admin.initialize_app(cred)
+            _firebase_app = _initialize_app_with_cert(sa_dict, sa_dict)
             logger.info("Firebase Admin initialized from service account JSON")
             return
         except json.JSONDecodeError as e:
@@ -61,7 +125,12 @@ def _init_firebase():
     # Fall back to Application Default Credentials.
     try:
         logger.info("Attempting Firebase init with Application Default Credentials")
-        _firebase_app = firebase_admin.initialize_app()
+        adc_project_id = _resolve_project_id()
+        if adc_project_id:
+            logger.info("Using ADC with explicit projectId=%s", adc_project_id)
+            _firebase_app = firebase_admin.initialize_app(options={"projectId": adc_project_id})
+        else:
+            _firebase_app = firebase_admin.initialize_app()
         logger.info("Firebase Admin initialized with default credentials")
     except Exception as e:
         logger.warning("Firebase Admin not initialized with ADC: %s", e)
@@ -99,18 +168,30 @@ async def verify_firebase_token(authorization: str = Header(default="")) -> dict
         )
 
     try:
-        decoded = firebase_auth.verify_id_token(token)
+        decoded = firebase_auth.verify_id_token(token, app=_firebase_app)
         logger.info("Token verified successfully for user: %s", decoded.get("uid"))
         return decoded
     except firebase_auth.ExpiredIdTokenError:
         logger.warning("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired. Please sign in again.")
-    except firebase_auth.InvalidIdTokenError:
-        logger.warning("Invalid authentication token: %s", str(e) if 'e' in locals() else "unknown")
+    except firebase_auth.InvalidIdTokenError as e:
+        logger.warning("Invalid authentication token: %s", e)
         raise HTTPException(status_code=401, detail="Invalid authentication token.")
     except firebase_auth.RevokedIdTokenError:
         logger.warning("Token has been revoked")
         raise HTTPException(status_code=401, detail="Token has been revoked.")
+    except ValueError as e:
+        if "project ID is required" in str(e):
+            logger.error("Firebase Admin misconfigured: missing project ID", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Server misconfiguration: Firebase project ID is missing. "
+                    "Set FIREBASE_PROJECT_ID or GOOGLE_CLOUD_PROJECT."
+                ),
+            )
+        logger.error("Firebase token verification failed with ValueError: %s", e, exc_info=True)
+        raise HTTPException(status_code=401, detail="Authentication failed.")
     except Exception as e:
         logger.error("Firebase token verification failed: %s (type: %s)", e, type(e).__name__, exc_info=True)
         raise HTTPException(status_code=401, detail="Authentication failed.")

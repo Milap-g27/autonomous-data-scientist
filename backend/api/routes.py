@@ -102,6 +102,9 @@ async def _build_analyze_response(session: Session) -> AnalyzeResponse:
     raw_metrics = result.get("metrics", {})
     safe_metrics = make_json_safe(raw_metrics)
 
+    raw_best_params = result.get("best_params", {})
+    safe_best_params = make_json_safe(raw_best_params)
+
     raw_eda = result.get("eda_results", {})
     safe_eda = make_json_safe(raw_eda)
 
@@ -110,6 +113,7 @@ async def _build_analyze_response(session: Session) -> AnalyzeResponse:
         problem_type=result.get("problem_type", ""),
         best_model=result.get("model_name", ""),
         metrics=safe_metrics,
+        best_params=safe_best_params,
         eda_results=safe_eda,
         eda_figures=figures_out,
         explanation=result.get("explanation", ""),

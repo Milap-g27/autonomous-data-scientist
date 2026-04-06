@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { FirebaseError } from "firebase/app";
-import { SplineSceneBasic } from "./demo";
+import { SplineRobotOnly } from "./demo";
 
 // ── Typewriter ──────────────────────────────
 
@@ -490,8 +490,8 @@ export function AuthUI() {
 
       {/* Right Panel — 3D Spline Scene Only */}
       <div className="hidden md:flex min-h-screen flex-col items-center justify-center bg-black px-8">
-        <div className="w-full max-w-[760px] h-[520px]">
-          <SplineSceneBasic showLeftContent={false} frameless />
+        <div className="w-full max-w-[760px] h-[520px] relative overflow-hidden rounded-2xl">
+          <SplineRobotOnly />
         </div>
 
         <div className="mt-6 text-center px-4">

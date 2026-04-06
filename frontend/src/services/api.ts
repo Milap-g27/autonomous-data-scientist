@@ -54,6 +54,7 @@ export interface AnalyzeResponse {
   problem_type: string;
   best_model: string;
   metrics: Record<string, Record<string, number>>;
+  best_params?: Record<string, Record<string, unknown>>;
   eda_results: Record<string, unknown>;
   eda_figures: FigureData[];
   explanation: string;
