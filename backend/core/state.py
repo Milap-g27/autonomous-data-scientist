@@ -1,6 +1,6 @@
 from typing import TypedDict, List, Dict, Any, Optional
+
 import pandas as pd
-import matplotlib.figure
 
 class AgentState(TypedDict):
     df: pd.DataFrame
@@ -16,7 +16,9 @@ class AgentState(TypedDict):
     model_name: str
     best_params: Dict[str, Dict[str, Any]]
     eda_results: Dict[str, Any]
-    eda_figures: List[matplotlib.figure.Figure]
+    eda_figures: List[Dict[str, Any]]
+    evaluation_results: Dict[str, Any]
+    evaluation_figures: List[Dict[str, Any]]
     explanation: str
     cleaning_report: str
     feature_report: str

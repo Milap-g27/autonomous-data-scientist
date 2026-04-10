@@ -99,6 +99,17 @@ async def _build_analyze_response(session: Session) -> AnalyzeResponse:
                     image_base64=await asyncio.to_thread(fig_to_base64, fig),
                 ))
 
+    evaluation_figures_out: list[FigureData] = []
+    for item in result.get("evaluation_figures", []):
+        if isinstance(item, dict):
+            fig = item.get("figure")
+            if fig is not None:
+                evaluation_figures_out.append(FigureData(
+                    heading=item.get("heading", ""),
+                    description=item.get("description", ""),
+                    image_base64=await asyncio.to_thread(fig_to_base64, fig),
+                ))
+
     raw_metrics = result.get("metrics", {})
     safe_metrics = make_json_safe(raw_metrics)
 
@@ -108,6 +119,9 @@ async def _build_analyze_response(session: Session) -> AnalyzeResponse:
     raw_eda = result.get("eda_results", {})
     safe_eda = make_json_safe(raw_eda)
 
+    raw_evaluation = result.get("evaluation_results", {})
+    safe_evaluation = make_json_safe(raw_evaluation)
+
     return AnalyzeResponse(
         session_id=session.id,
         problem_type=result.get("problem_type", ""),
@@ -116,6 +130,8 @@ async def _build_analyze_response(session: Session) -> AnalyzeResponse:
         best_params=safe_best_params,
         eda_results=safe_eda,
         eda_figures=figures_out,
+        evaluation_results=safe_evaluation,
+        evaluation_figures=evaluation_figures_out,
         explanation=result.get("explanation", ""),
         cleaning_report=result.get("cleaning_report", ""),
         feature_report=result.get("feature_report", ""),

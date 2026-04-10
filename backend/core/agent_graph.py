@@ -9,7 +9,11 @@ from pipeline.data_cleaning import clean_data
 from pipeline.eda import perform_eda
 from pipeline.feature_engineering import perform_feature_engineering
 from pipeline.model_training import train_models
-from pipeline.model_evaluation import evaluate_models, extract_model_best_params
+from pipeline.model_evaluation import (
+    evaluate_models,
+    extract_model_best_params,
+    generate_post_training_evaluation,
+)
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
@@ -68,7 +72,24 @@ async def evaluate_models_node(state: AgentState) -> dict:
     if problem_type == "Clustering":
         # Evaluate on full data, no y needed
         metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X, None, problem_type)
-        return {"metrics": metrics, "model_name": best_model_name, "best_params": best_params}
+        best_model = models.get(best_model_name)
+        evaluation_results, evaluation_figures = await asyncio.to_thread(
+            generate_post_training_evaluation,
+            best_model,
+            problem_type,
+            None,
+            None,
+            None,
+            None,
+            X,
+        )
+        return {
+            "metrics": metrics,
+            "model_name": best_model_name,
+            "best_params": best_params,
+            "evaluation_results": evaluation_results,
+            "evaluation_figures": evaluation_figures,
+        }
     
     X_test = state.get('X_test')
     y_test = state.get('y_test')
@@ -77,6 +98,18 @@ async def evaluate_models_node(state: AgentState) -> dict:
         raise ValueError("X_test/y_test missing from state. Ensure train_models_node ran first.")
     
     metrics, best_model_name = await asyncio.to_thread(evaluate_models, models, X_test, y_test, problem_type)
+    best_model_for_eval = models.get(best_model_name)
+
+    evaluation_results, evaluation_figures = await asyncio.to_thread(
+        generate_post_training_evaluation,
+        best_model_for_eval,
+        problem_type,
+        X_test,
+        y_test,
+        state.get("X_train"),
+        state.get("y_train"),
+        None,
+    )
 
     # Refit only the selected best model on full supervised data for final inference.
     # This keeps evaluation fair (train/test split) while maximizing prediction quality.
@@ -90,7 +123,14 @@ async def evaluate_models_node(state: AgentState) -> dict:
             # Fallback: keep the trained split model if full-data refit fails.
             pass
     
-    return {"metrics": metrics, "model_name": best_model_name, "best_params": best_params, "models": models}
+    return {
+        "metrics": metrics,
+        "model_name": best_model_name,
+        "best_params": best_params,
+        "models": models,
+        "evaluation_results": evaluation_results,
+        "evaluation_figures": evaluation_figures,
+    }
 
 def build_graph():
     workflow = StateGraph(AgentState)

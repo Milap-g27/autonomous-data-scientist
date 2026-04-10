@@ -4,7 +4,10 @@ import { Image as ImageIcon } from 'lucide-react';
 interface Props { result: AnalyzeResponse; }
 
 export default function PlotsTab({ result }: Props) {
-  const figures = result.eda_figures || [];
+  const figures = [
+    ...(result.eda_figures || []),
+    ...(result.evaluation_figures || []),
+  ];
   
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -13,7 +16,7 @@ export default function PlotsTab({ result }: Props) {
           Visualizations
         </h2>
         <p className="text-sm text-neutral-400">
-          Graphical representations of the data distributions, correlations, and target dependencies.
+          EDA visuals plus post-training diagnostics based on fitted model outputs.
         </p>
       </div>
 

@@ -57,6 +57,8 @@ export interface AnalyzeResponse {
   best_params?: Record<string, Record<string, unknown>>;
   eda_results: Record<string, unknown>;
   eda_figures: FigureData[];
+  evaluation_results?: Record<string, unknown>;
+  evaluation_figures?: FigureData[];
   explanation: string;
   cleaning_report: string;
   feature_report: string;

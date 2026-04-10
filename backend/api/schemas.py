@@ -65,6 +65,8 @@ class AnalyzeResponse(BaseModel):
     best_params: Dict[str, Dict[str, Any]]
     eda_results: Dict[str, Any]
     eda_figures: List[FigureData]
+    evaluation_results: Dict[str, Any] = Field(default_factory=dict)
+    evaluation_figures: List[FigureData] = Field(default_factory=list)
     explanation: str
     cleaning_report: str
     feature_report: str
