@@ -24,7 +24,8 @@ async def clean_data_node(state: AgentState) -> dict:
 async def eda_node(state: AgentState) -> dict:
     df = state['df']
     target = state.get('target')
-    metrics, figures = await asyncio.to_thread(perform_eda, df, target)
+    problem_type = state.get('problem_type', 'Regression')
+    metrics, figures = await asyncio.to_thread(perform_eda, df, target, problem_type)
     return {"eda_results": metrics, "eda_figures": figures}
 
 async def feature_engineering_node(state: AgentState) -> dict:
