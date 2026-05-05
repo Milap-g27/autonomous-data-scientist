@@ -15,6 +15,7 @@ class Session:
     __slots__ = (
         "id", "created_at", "df", "config", "result",
         "chat_history", "task_status", "task_error",
+        "task_progress", "task_current_step",
         "owner_uid",
     )
 
@@ -27,6 +28,8 @@ class Session:
         self.chat_history: List[Dict[str, str]] = []
         self.task_status: str = "idle"     # idle | running | completed | failed
         self.task_error: Optional[str] = None
+        self.task_progress: List[Dict[str, Any]] = []
+        self.task_current_step: Optional[str] = None
         self.owner_uid: Optional[str] = None
 
 

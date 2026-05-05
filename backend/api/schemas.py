@@ -125,6 +125,8 @@ class TaskStatus(BaseModel):
 class SessionStatusResponse(BaseModel):
     status: str
     error: Optional[str] = None
+    current_step: Optional[str] = None
+    progress_timeline: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # ── Health ──────────────────────────────────

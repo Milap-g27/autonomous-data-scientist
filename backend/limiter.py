@@ -19,6 +19,6 @@ if Limiter is None:
 else:
 	limiter = Limiter(
 		key_func=get_remote_address,
-		default_limits=["60/minute"],
+		default_limits=["120/minute"],
 		enabled=settings.RATE_LIMIT_ENABLED,
 	)

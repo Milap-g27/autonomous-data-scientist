@@ -74,6 +74,15 @@ export interface AnalyzeStartResponse {
 export interface AnalysisStatusResponse {
   status: "idle" | "running" | "completed" | "failed";
   error?: string | null;
+  current_step?: string | null;
+  progress_timeline?: Array<{
+    key: string;
+    label: string;
+    status: "pending" | "running" | "completed" | "failed";
+    started_at?: string | null;
+    completed_at?: string | null;
+    detail?: string;
+  }>;
 }
 
 export interface PredictResponse {

@@ -44,6 +44,55 @@ from limiter import limiter
 router = APIRouter()
 
 
+_TIMELINE_TEMPLATE = [
+    ("cleaning", "Cleaning"),
+    ("eda", "EDA"),
+    ("baseline", "Baseline model"),
+    ("advanced", "Advanced plots"),
+]
+
+
+def _utc_iso_now() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _new_progress_timeline() -> list[dict[str, Any]]:
+    return [
+        {
+            "key": key,
+            "label": label,
+            "status": "pending",
+            "started_at": None,
+            "completed_at": None,
+            "detail": "",
+        }
+        for key, label in _TIMELINE_TEMPLATE
+    ]
+
+
+def _set_step_status(session: Session, key: str, status: str, detail: str = "") -> None:
+    if not session.task_progress:
+        session.task_progress = _new_progress_timeline()
+
+    for step in session.task_progress:
+        if step.get("key") != key:
+            continue
+
+        step["status"] = status
+        if status == "running" and not step.get("started_at"):
+            step["started_at"] = _utc_iso_now()
+        if status in {"completed", "failed"}:
+            step["completed_at"] = _utc_iso_now()
+        if detail:
+            step["detail"] = detail
+        break
+
+    if status == "running":
+        session.task_current_step = key
+    elif session.task_current_step == key:
+        session.task_current_step = None
+
+
 def _enforce_session_access(session: Session, uid: str) -> None:
     if session.owner_uid is None:
         session.owner_uid = uid
@@ -62,6 +111,8 @@ async def _run_analysis_task(session_id: str) -> None:
 
         session.task_status = "running"
         session.task_error = None
+        session.task_progress = _new_progress_timeline()
+        _set_step_status(session, "cleaning", "running", "Data cleaning in progress")
         start_time = time.time()
 
         graph = build_graph()
@@ -70,7 +121,28 @@ async def _run_analysis_task(session_id: str) -> None:
             "target": session.config.get("target"),
         }
 
-        result = await graph.ainvoke(initial_state)  # type: ignore[arg-type]
+        result: dict[str, Any] = dict(initial_state)
+
+        async for update in graph.astream(initial_state, stream_mode="updates"):  # type: ignore[arg-type]
+            if not isinstance(update, dict):
+                continue
+
+            for node_name, node_output in update.items():
+                if isinstance(node_output, dict):
+                    result.update(node_output)
+
+                if node_name == "clean_data":
+                    _set_step_status(session, "cleaning", "completed", "Cleaning done")
+                    _set_step_status(session, "eda", "running", "Generating EDA and guaranteed plots")
+                elif node_name == "eda":
+                    _set_step_status(session, "eda", "completed", "EDA done")
+                    _set_step_status(session, "baseline", "running", "Training and selecting baseline model")
+                elif node_name == "train_models":
+                    _set_step_status(session, "baseline", "completed", "Baseline model done")
+                    _set_step_status(session, "advanced", "running", "Advanced plots running")
+                elif node_name == "evaluate_models":
+                    _set_step_status(session, "advanced", "completed", "Advanced plots ready")
+
         elapsed = round(time.time() - start_time, 1)
         if isinstance(result, dict):
             result["_training_time_sec"] = elapsed
@@ -78,6 +150,8 @@ async def _run_analysis_task(session_id: str) -> None:
         session.task_status = "completed"
         session.task_error = None
     except Exception:
+        if session.task_current_step:
+            _set_step_status(session, session.task_current_step, "failed", "Failed during execution")
         session.task_status = "failed"
         session.task_error = traceback.format_exc()
 
@@ -232,6 +306,8 @@ async def analyze(
 
     session.task_status = "running"
     session.task_error = None
+    session.task_progress = _new_progress_timeline()
+    _set_step_status(session, "cleaning", "running", "Queued")
     background_tasks.add_task(_run_analysis_task, session.id)
 
     return AnalyzeStartResponse(session_id=session.id, status="started")
@@ -251,7 +327,12 @@ async def get_status(
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication failed: missing uid in token.")
     _enforce_session_access(session, uid)
-    return SessionStatusResponse(status=session.task_status, error=session.task_error)
+    return SessionStatusResponse(
+        status=session.task_status,
+        error=session.task_error,
+        current_step=session.task_current_step,
+        progress_timeline=session.task_progress,
+    )
 
 
 @router.get("/results/{session_id}", response_model=AnalyzeResponse)

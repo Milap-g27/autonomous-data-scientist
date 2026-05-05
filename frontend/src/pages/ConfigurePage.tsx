@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Play, ChevronDown } from 'lucide-react';
+import { Play, ChevronDown, CheckCircle2, Loader2, Circle, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   configureSession,
@@ -7,6 +7,7 @@ import {
   getAnalysisStatus,
   getAnalysisResult,
   type DatasetInfo,
+  type AnalysisStatusResponse,
   type AnalyzeResponse,
 } from '../services/api';
 
@@ -14,6 +15,45 @@ interface Props {
   sessionId: string;
   datasetInfo: DatasetInfo;
   onAnalysisComplete: (result: AnalyzeResponse, target: string | null) => void;
+}
+
+type TimelineStep = NonNullable<AnalysisStatusResponse['progress_timeline']>[number];
+
+const DEFAULT_TIMELINE: TimelineStep[] = [
+  { key: 'cleaning', label: 'Cleaning', status: 'pending', detail: '' },
+  { key: 'eda', label: 'EDA', status: 'pending', detail: '' },
+  { key: 'baseline', label: 'Baseline model', status: 'pending', detail: '' },
+  { key: 'advanced', label: 'Advanced plots', status: 'pending', detail: '' },
+];
+
+const MIN_RUNNING_UI_MS = 1800;
+const STATUS_POLL_INTERVAL_MS = 3000;
+
+function normalizeTimeline(
+  incoming: AnalysisStatusResponse['progress_timeline'] | undefined,
+  status: AnalysisStatusResponse['status']
+): TimelineStep[] {
+  if (incoming && incoming.length > 0) return incoming;
+
+  if (status === 'completed') {
+    return DEFAULT_TIMELINE.map((step) => ({ ...step, status: 'completed' as const }));
+  }
+
+  if (status === 'running') {
+    return DEFAULT_TIMELINE.map((step, idx) => ({
+      ...step,
+      status: idx === 0 ? ('running' as const) : ('pending' as const),
+    }));
+  }
+
+  if (status === 'failed') {
+    return DEFAULT_TIMELINE.map((step, idx) => ({
+      ...step,
+      status: idx === 0 ? ('failed' as const) : ('pending' as const),
+    }));
+  }
+
+  return DEFAULT_TIMELINE;
 }
 
 export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComplete }: Props) {
@@ -28,6 +68,8 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [timeline, setTimeline] = useState<TimelineStep[]>(DEFAULT_TIMELINE);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -40,6 +82,8 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
     setError('');
     setRunning(true);
     setElapsedSeconds(0);
+    setTimeline(DEFAULT_TIMELINE);
+    setCurrentStep('cleaning');
     try {
       await configureSession({
         session_id: sessionId,
@@ -58,9 +102,17 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
       while (true) {
         const status = await getAnalysisStatus(sessionId);
         const elapsed = Math.floor((Date.now() - pollStart) / 1000);
-        if (isMountedRef.current) setElapsedSeconds(elapsed);
+        if (isMountedRef.current) {
+          setElapsedSeconds(elapsed);
+          setTimeline(normalizeTimeline(status.progress_timeline, status.status));
+          setCurrentStep(status.current_step || null);
+        }
 
         if (status.status === 'completed') {
+          const elapsedMs = Date.now() - pollStart;
+          if (elapsedMs < MIN_RUNNING_UI_MS) {
+            await new Promise((resolve) => setTimeout(resolve, MIN_RUNNING_UI_MS - elapsedMs));
+          }
           const res = await getAnalysisResult(sessionId);
           onAnalysisComplete(res, target);
           navigate('/results');
@@ -75,7 +127,7 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
           throw new Error('Analysis is taking longer than expected. Please try again shortly.');
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_INTERVAL_MS));
       }
     } catch (err) {
       if (isMountedRef.current) {
@@ -84,6 +136,8 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
       }
     }
   };
+
+  const activeStepLabel = timeline.find((step) => step.key === currentStep)?.label || 'Preparing';
 
   if (running) {
     return (
@@ -98,12 +152,43 @@ export default function ConfigurePage({ sessionId, datasetInfo, onAnalysisComple
         <p className="text-neutral-400 text-sm font-medium">Agent is working — analyzing, modeling, explaining…</p>
         <p className="text-neutral-600 text-xs">This may take a few minutes depending on dataset size.</p>
         <p className="text-neutral-500 text-xs">Elapsed: {elapsedSeconds}s</p>
-        <div className="flex gap-1 mt-4">
-          {['Cleaning', 'EDA', 'Feature Eng.', 'Training', 'Evaluation'].map((step, i) => (
-            <span key={step} className="px-3 py-1.5 bg-neutral-900 border border-white/5 rounded-full text-[10px] text-neutral-500 animate-pulse" style={{ animationDelay: `${i * 200}ms` }}>
-              {step}
-            </span>
-          ))}
+
+        <div className="w-full max-w-xl mt-2 rounded-2xl border border-white/10 bg-neutral-900/40 p-4">
+          <p className="text-[11px] uppercase tracking-widest text-neutral-500 mb-3">
+            Live Timeline · Current: <span className="text-neutral-300 normal-case tracking-normal">{activeStepLabel}</span>
+          </p>
+
+          <div className="space-y-3">
+            {timeline.map((step) => {
+              const isRunning = step.status === 'running';
+              const isDone = step.status === 'completed';
+              const isFailed = step.status === 'failed';
+
+              return (
+                <div key={step.key} className="flex items-center gap-3">
+                  <div className="shrink-0">
+                    {isDone && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+                    {isRunning && <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />}
+                    {isFailed && <AlertTriangle className="h-4 w-4 text-red-400" />}
+                    {!isDone && !isRunning && !isFailed && <Circle className="h-4 w-4 text-neutral-600" />}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${isDone ? 'text-neutral-200' : isRunning ? 'text-blue-300' : isFailed ? 'text-red-300' : 'text-neutral-500'}`}>
+                      {step.label}
+                    </p>
+                    {step.detail && (
+                      <p className="text-[11px] text-neutral-500 truncate">{step.detail}</p>
+                    )}
+                  </div>
+
+                  <span className="text-[10px] uppercase tracking-wide text-neutral-500">
+                    {step.status}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );

@@ -1,0 +1,390 @@
+# CLAUDE.md — Autonomous Data Scientist Agent
+
+> **Authoritative project documentation.** Any AI assistant reading this file gains immediate,
+> complete context for the repository's architecture, conventions, and operational contract.
+
+---
+
+## 1. Project Identity
+
+| Field | Value |
+|-------|-------|
+| **Name** | Autonomous Data Scientist Agent |
+| **Purpose** | End-to-end AI agent that takes a raw CSV, autonomously cleans, explores, engineers features, trains/evaluates ML models, and explains results in plain English |
+| **Architecture** | Monorepo — `backend/` (Python FastAPI) + `frontend/` (React + Vite + TailwindCSS) |
+| **Agent Framework** | LangGraph (state-machine orchestration) |
+| **LLM** | Llama 3.3 70B via ChatGroq (primary), Anthropic Claude (optional fallback for EDA planning) |
+| **ML Stack** | scikit-learn, XGBoost, LightGBM, CatBoost |
+| **Auth** | Firebase Authentication (Google Sign-In + Email/Password) |
+| **Deployment** | Backend → Render (Docker), Frontend → Vercel |
+
+---
+
+## 2. Repository Structure
+
+```
+autonomous-data-scientist/
+│
+├── CLAUDE.md                    # ← This file
+├── README.md                    # Public-facing documentation
+├── requirements.txt             # Root-level frozen deps (reference only)
+├── .gitignore
+├── backend.bat / frontend.bat   # Windows helper scripts
+│
+├── backend/                     # FastAPI + LangGraph backend
+│   ├── main.py                  # App entry: FastAPI, CORS, middleware, rate limiting
+│   ├── config.py                # Pydantic-settings (env → Settings singleton)
+│   ├── limiter.py               # SlowAPI rate limiter (60/min default, noop fallback)
+│   ├── Dockerfile               # Python 3.11-slim, uvicorn start
+│   ├── render.yaml              # Render IaC blueprint
+│   ├── requirements.txt         # Backend-specific pinned deps
+│   │
+│   ├── core/                    # LangGraph graph + state definition
+│   │   ├── state.py             # AgentState TypedDict (df, X, y, models, metrics, etc.)
+│   │   └── agent_graph.py       # build_graph() — 7-node linear StateGraph
+│   │
+│   ├── llm/                     # LLM-powered nodes
+│   │   ├── understand_data.py   # Infers problem type (Regression/Classification/Clustering)
+│   │   └── explain_results.py   # Generates plain-English analysis report
+│   │
+│   ├── pipeline/                # CPU-bound ML pipeline stages
+│   │   ├── data_cleaning.py     # Dedup, impute (median/mode), LabelEncode categoricals
+│   │   ├── eda.py               # AI-guided EDA: LLM plot planning + 20 plot types
+│   │   ├── feature_engineering.py  # One-hot, interaction terms, polynomial features
+│   │   ├── model_training.py    # 14 regression / 13 classification / 6 clustering models
+│   │   └── model_evaluation.py  # R²/F1/Silhouette selection + best-params extraction
+│   │
+│   └── api/                     # FastAPI routing layer
+│       ├── routes.py            # All endpoint handlers + sandboxed plot execution
+│       ├── schemas.py           # Pydantic request/response models
+│       ├── session.py           # In-memory SessionStore (asyncio-locked dict)
+│       ├── auth.py              # Firebase Admin SDK init + verify_firebase_token dependency
+│       └── utils.py             # fig_to_base64, build_dataset_summary, make_json_safe
+│
+└── frontend/                    # React 19 + Vite 8 + TailwindCSS 3 SPA
+    ├── index.html
+    ├── package.json
+    ├── vite.config.ts
+    ├── tailwind.config.js
+    ├── vercel.json              # Vercel SPA rewrite rules
+    └── src/
+        ├── main.tsx             # React entry (AuthProvider wraps App)
+        ├── App.tsx              # BrowserRouter: /, /configure, /results, /auth
+        ├── index.css            # Global + TailwindCSS imports
+        │
+        ├── lib/
+        │   ├── firebase.ts      # Firebase config (VITE_FIREBASE_* env vars)
+        │   └── utils.ts         # cn() utility (clsx + tailwind-merge)
+        │
+        ├── context/
+        │   └── AuthContext.tsx   # Firebase auth state, token injection into API service
+        │
+        ├── hooks/
+        │   └── useAuth.ts       # useAuthContext() re-export
+        │
+        ├── services/
+        │   └── api.ts           # All fetch wrappers: upload, configure, analyze, predict, chat
+        │
+        ├── pages/
+        │   ├── Layout.tsx       # App shell with nav, sidebar
+        │   ├── AuthPage.tsx     # Login/Signup page
+        │   ├── HomePage.tsx     # 3D robot + CSV upload
+        │   ├── ConfigurePage.tsx # Target selection, settings, run analysis
+        │   └── ResultsPage.tsx  # 6-tab results dashboard
+        │
+        ├── components/
+        │   ├── ProtectedRoute.tsx   # Auth guard
+        │   └── ui/                  # Reusable UI primitives
+        │       ├── auth-fuse.tsx    # Animated auth form
+        │       ├── card.tsx         # Card component
+        │       ├── demo.tsx         # Demo component
+        │       ├── evervault-card.tsx # Animated card
+        │       ├── splite.tsx       # Spline 3D embed
+        │       └── spotlight.tsx    # Spotlight effect
+        │
+        └── features/
+            ├── results/components/  # Results dashboard tabs
+            │   ├── EDATab.tsx           # Summary stats, missing values, data types
+            │   ├── PlotsTab.tsx         # EDA figure gallery
+            │   ├── ModelPerformanceTab.tsx # Metric comparison bar charts + table
+            │   ├── PredictionsTab.tsx    # Live prediction form
+            │   ├── AIExplanationTab.tsx  # LLM explanation display
+            │   └── ProcessingLogTab.tsx  # Cleaning + FE reports + pipeline diagram
+            │
+            └── chat/components/
+                └── ChatPanel.tsx     # Floating AI chatbot (💬) scoped to session
+```
+
+---
+
+## 3. LangGraph Agent Pipeline
+
+The agent is a **7-node linear StateGraph** compiled once per analysis run:
+
+```
+understand_data → clean_data → eda → feature_engineering → train_models → evaluate_models → explain_results → END
+```
+
+### AgentState (TypedDict)
+| Field | Type | Purpose |
+|-------|------|---------|
+| `df` | `pd.DataFrame` | Working dataset (mutated by cleaning) |
+| `problem_type` | `str` | `"Regression"` / `"Classification"` / `"Clustering"` |
+| `target` | `Optional[str]` | Target column name (None for clustering) |
+| `X`, `y` | DataFrame / Series | Features and target after FE |
+| `X_train/X_test/y_train/y_test` | Optional splits | 80/20 split for supervised |
+| `metrics` | `Dict[str, Any]` | Per-model evaluation scores |
+| `model_name` | `str` | Best model name |
+| `best_params` | `Dict` | Non-default hyperparameters per model |
+| `eda_results` | `Dict` | Stats, correlations, plot plan metadata |
+| `eda_figures` | `List[Figure]` | Rendered matplotlib figures |
+| `explanation` | `str` | LLM-generated narrative |
+| `cleaning_report` | `str` | Data cleaning log |
+| `feature_report` | `str` | Feature engineering log |
+| `models` | `Dict[str, Any]` | Fitted model objects |
+
+### Node Details
+
+1. **`understand_data`** — LLM infers problem type from data sample; heuristic fallback (>10 unique numeric values → Regression)
+2. **`clean_data`** — Normalizes pandas 2.x extension dtypes, drops duplicates, fills missing (median/mode), LabelEncodes categoricals
+3. **`eda`** — AI-guided: tries Anthropic → Groq → deterministic fallback for plot planning; renders up to 18 plots from 20 supported types
+4. **`feature_engineering`** — One-hot encoding, interaction terms (top 2 correlated), polynomial features (top feature squared)
+5. **`train_models`** — RandomizedSearchCV tuning; Clustering uses `_best_k_by_silhouette` for auto-k
+6. **`evaluate_models`** — Best model selection (R² → Regression, F1 → Classification, Silhouette → Clustering); refits best on full data for supervised
+7. **`explain_results`** — LLM generates stakeholder-friendly narrative
+
+---
+
+## 4. ML Model Suite
+
+### Regression (14 models)
+Linear Regression, Ridge, Lasso, ElasticNet, SVR, KNN Regressor, Decision Tree, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, Neural Network (MLP), Voting Ensemble
+
+### Classification (13 models)
+Logistic Regression, SVM, KNN Classifier, Naive Bayes, Decision Tree, Random Forest, Gradient Boosting, AdaBoost, XGBoost, LightGBM, CatBoost, Neural Network (MLP), Voting Ensemble
+
+### Clustering (6 models)
+KMeans (auto-k via silhouette), Agglomerative (4 linkages), DBSCAN (grid search eps/min_samples), MeanShift (bandwidth tuning), Birch, Gaussian Mixture (BIC selection)
+
+### Training Conventions
+- All models wrapped in `Pipeline(preprocessor → model)` with `StandardScaler` on numeric columns
+- Hyperparameter tuning via `RandomizedSearchCV` with adaptive `n_iter` (capped at search space size)
+- CV folds: `max(2, min(5, n_rows // 10))` for regression; `max(2, min(5, min_class_count))` for classification
+- `DEFAULT_RANDOM_STATE = 42` used everywhere
+- Ensemble (Voting) built from top 5 candidate models if ≥2 are available
+- Optional imports: XGBoost, LightGBM, CatBoost handled via try/except; gracefully skipped if not installed
+
+### Evaluation Metrics
+| Problem Type | Primary Metric | All Metrics |
+|--------------|---------------|-------------|
+| Regression | R² | MSE, R², MAE |
+| Classification | F1 (weighted) | Accuracy, Precision, Recall, F1 |
+| Clustering | Silhouette Score | Clusters, Noise Points, Silhouette, Calinski-Harabasz, Davies-Bouldin |
+
+---
+
+## 5. API Contract
+
+**Base path:** `/api` (all routes prefixed)
+
+| Method | Endpoint | Auth | Rate Limit | Purpose |
+|--------|----------|------|------------|---------|
+| `POST` | `/upload` | No* | 10/min | Upload CSV, get session_id + DatasetInfo |
+| `POST` | `/configure` | Firebase | — | Set target, problem_hint, test_size, random_seed, scaling |
+| `POST` | `/analyze` | Firebase | 5/min | Start async pipeline (background task), returns immediately |
+| `GET` | `/status/{session_id}` | Firebase | — | Poll task status: idle/running/completed/failed |
+| `GET` | `/results/{session_id}` | Firebase | — | Fetch full analysis results after completion |
+| `POST` | `/predict` | Firebase | — | Single-row prediction using best model |
+| `POST` | `/chat` | Firebase | 30/min | Session-scoped AI chatbot with plot generation |
+| `GET` | `/sessions` | Firebase | — | List user's session IDs |
+| `DELETE` | `/sessions/{session_id}` | Firebase | — | Delete a session |
+| `GET` | `/health` | No | — | Returns `{"status": "ok", "timestamp": ...}` |
+
+*Upload is rate-limited but not auth-gated to allow the initial upload flow.
+
+### Session Ownership
+- Sessions are bound to Firebase `uid` on first authenticated access
+- `_enforce_session_access()` prevents cross-user access (HTTP 403)
+- In-memory storage via `SessionStore` (asyncio-locked dict) — **not persistent across restarts**
+
+### Chat Sandbox
+- LLM-generated plot code runs in an **isolated subprocess** (`subprocess.run` with 45s timeout)
+- DataFrame is serialized as JSON (first 5000 rows), base64-encoded and injected
+- Matplotlib Agg backend, output saved as temp PNG → base64 response
+- Optional memory limit via `PLOT_SANDBOX_MEMORY_MB` env var
+
+---
+
+## 6. EDA Plot System
+
+The EDA module supports **20 plot types**: histogram, kde, boxplot, violinplot, barplot, countplot, scatterplot, lineplot, heatmap, pairplot, piechart, stackedbar, missingvalues, outlierdetection, distribution_grid, target_vs_feature, class_balance, regression_residual, feature_importance_proxy, pca_scatter
+
+### Plot Plan Source Priority
+1. **Anthropic** (Claude) — if `ANTHROPIC_API_KEY` set
+2. **Groq** (Llama 3.3 70B) — if `GROQ_API_KEY` set
+3. **Deterministic fallback** — rule-based plan based on data profile
+
+All AI-generated plans are validated against `SUPPORTED_PLOT_TYPES` and sanitized. If AI plan produces zero renderable figures, falls back to deterministic.
+
+---
+
+## 7. Frontend Architecture
+
+### Tech Stack
+- **React 19** + **TypeScript 5.9** + **Vite 8**
+- **TailwindCSS 3** for styling
+- **Framer Motion** for animations
+- **Spline** for 3D robot on homepage
+- **Lucide React** for icons
+- **Radix UI** primitives (Label, Slot)
+- **Firebase Auth** (Google + Email/Password)
+
+### Routing (BrowserRouter)
+| Path | Page | Guard |
+|------|------|-------|
+| `/auth` | AuthPage | Public |
+| `/` | HomePage (3D robot + upload) | Protected |
+| `/configure` | ConfigurePage (target selection + settings) | Protected + requires sessionId |
+| `/results` | ResultsPage (6-tab dashboard) | Protected + requires analysis result |
+| `*` | Redirect → `/` | — |
+
+### Results Dashboard Tabs
+1. **📊 EDA & Insights** — Summary stats, missing values, data types
+2. **📈 Plots & Visualizations** — EDA figure gallery with headings/descriptions
+3. **🏆 Model Performance** — Bar chart comparison, metrics table, best model highlight
+4. **🔮 Predictions** — Form with median-prefilled inputs, live prediction
+5. **📝 AI Explanation** — LLM narrative rendered as markdown
+6. **⚙️ Processing Log** — Cleaning report, feature engineering report, pipeline diagram
+
+### State Flow
+```
+HomePage.onUpload → sessionId + datasetInfo
+   ↓
+ConfigurePage.onAnalyze → polls /status → fetches /results → AnalyzeResponse
+   ↓
+ResultsPage → renders all tabs + ChatPanel
+```
+
+### Auth Flow
+```
+AuthContext (Firebase onAuthStateChanged)
+   ↓ setAuthTokenGetter
+api.ts authHeaders() → Bearer token injection on every request
+```
+
+---
+
+## 8. Environment Variables
+
+### Backend (`.env` in `backend/`)
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `GROQ_API_KEY` | Yes | None | LLM inference (ChatGroq) |
+| `ANTHROPIC_API_KEY` | No | None | Optional EDA plot planning |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Yes (prod) | None | Firebase Admin auth verification |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | No | None | Alternative: path to service account file |
+| `FIREBASE_PROJECT_ID` | No | Auto-detected | Override Firebase project ID |
+| `CORS_ORIGINS` | No | `*` | Comma-separated allowed origins |
+| `RATE_LIMIT_ENABLED` | No | `true` | Enable/disable slowapi rate limiting |
+| `PLOT_DEBUG` | No | `false` | Include plot diagnostics in chat responses |
+| `PLOT_SANDBOX_MEMORY_MB` | No | `0` (unlimited) | Memory limit for sandboxed plot subprocess |
+| `HOST` | No | `0.0.0.0` | Bind host |
+| `PORT` | No | `8000` | Bind port |
+
+### Frontend (`.env` in `frontend/`)
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `VITE_API_BASE` | No (default: `http://127.0.0.1:8000/api`) | Backend API URL |
+| `VITE_FIREBASE_API_KEY` | Yes | Firebase web config |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | Firebase web config |
+| `VITE_FIREBASE_PROJECT_ID` | Yes | Firebase web config |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Firebase web config |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase web config |
+| `VITE_FIREBASE_APP_ID` | Yes | Firebase web config |
+| `VITE_FIREBASE_MEASUREMENT_ID` | No | Firebase Analytics (optional) |
+
+---
+
+## 9. Key Design Decisions & Gotchas
+
+### Backend
+- **Async pipeline**: All pipeline nodes are `async def` wrappers that delegate CPU work to `asyncio.to_thread()`. The graph runs via `graph.ainvoke()`.
+- **Session storage is in-memory**: Sessions (DataFrames, trained models) live in `SessionStore._sessions` dict. A Render restart loses all data. The codebase explicitly notes "Replace with Redis / DB for production."
+- **Best model refitting**: After evaluation, the best supervised model is re-fitted on the **full dataset** (train+test) for optimal prediction quality. Evaluation scores still reflect the honest train/test split.
+- **Pandas 2.x compatibility**: `data_cleaning.py` explicitly normalizes nullable extension types (StringDtype, BooleanDtype, Int64Dtype) to NumPy-compatible equivalents before processing.
+- **LabelEncoder reuse in predict**: The `/predict` endpoint reconstructs the full pipeline by concatenating the new row with the original dataset, cleaning/FE-ing the combined data, then extracting the last row. This ensures feature alignment.
+
+### Frontend
+- **No state persistence**: All app state (sessionId, datasetInfo, result) lives in React `useState` — a page refresh resets. Navigation guards redirect to `/` if state is missing.
+- **3D Spline**: The homepage embeds a Spline 3D robot scene (`@splinetool/react-spline`).
+- **Auth token auto-injection**: `AuthContext` wires `getIdToken()` into `api.ts` via `setAuthTokenGetter()` on mount.
+
+### LLM
+- **Temperature**: `understand_data` uses 0, `explain_results` uses 0.7, `chat` uses 0.3, `eda` planning uses 0.1
+- **Fallback heuristics**: If LLM fails or hallucinates, both `understand_data` and `eda` have deterministic fallback logic
+
+---
+
+## 10. Development Workflow
+
+### Start Backend
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# Create .env with GROQ_API_KEY and Firebase SA
+uvicorn main:app --reload
+```
+
+### Start Frontend
+```bash
+cd frontend
+npm install
+# Create .env with VITE_* Firebase config
+npm run dev
+```
+Frontend runs on `http://localhost:5173`, Backend on `http://localhost:8000`.
+
+### Deployment
+- **Backend** → Render (Docker or native Python service via `render.yaml`)
+- **Frontend** → Vercel (static SPA, `vercel.json` handles SPA rewrites)
+
+---
+
+## 11. Critical Patterns for Contributors
+
+1. **Adding a new ML model**: Add to `_train_regression()` / `_train_classification()` / `_train_clustering()` in `pipeline/model_training.py`. Always wrap in `_make_pipeline()` for scaling. Use `_tune()` for hyperparameter search with try/except guard.
+
+2. **Adding a new EDA plot type**: Add the type string to `SUPPORTED_PLOT_TYPES` set, add the rendering case in `_execute_plot()`, and optionally add to `_default_plot_plan()` for deterministic fallback.
+
+3. **Adding a new API endpoint**: Add Pydantic models to `api/schemas.py`, add route handler to `api/routes.py`, use `Depends(verify_firebase_token)` for protected endpoints.
+
+4. **Adding a frontend tab**: Create a component in `frontend/src/features/results/components/`, import in `ResultsPage.tsx`.
+
+5. **Chat capabilities**: The chatbot system prompt is self-contained in `routes.py::_SYSTEM_TEMPLATE`. Plot code runs sandboxed in a subprocess — never in the main process.
+
+---
+
+## 12. File-Level Quick Reference
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `backend/main.py` | 111 | FastAPI app setup, middleware, CORS |
+| `backend/config.py` | 26 | Pydantic settings (env vars) |
+| `backend/core/state.py` | 24 | AgentState TypedDict |
+| `backend/core/agent_graph.py` | 118 | 7-node StateGraph + async wrappers |
+| `backend/llm/understand_data.py` | 68 | LLM problem type detection |
+| `backend/llm/explain_results.py` | 93 | LLM results explanation |
+| `backend/pipeline/data_cleaning.py` | 77 | Data cleaning pipeline |
+| `backend/pipeline/eda.py` | 858 | AI-guided EDA (plot plan + 20 renderers) |
+| `backend/pipeline/feature_engineering.py` | 72 | Feature engineering |
+| `backend/pipeline/model_training.py` | 940 | 33 model implementations with tuning |
+| `backend/pipeline/model_evaluation.py` | 206 | Evaluation + best-params extraction |
+| `backend/api/routes.py` | 739 | All API endpoints + chat + sandbox |
+| `backend/api/schemas.py` | 133 | Pydantic request/response schemas |
+| `backend/api/session.py` | 70 | In-memory session store |
+| `backend/api/auth.py` | 198 | Firebase Admin SDK + token verification |
+| `backend/api/utils.py` | 77 | Conversion helpers |
+| `frontend/src/App.tsx` | 90 | Routing + state management |
+| `frontend/src/services/api.ts` | 171 | API client with auth token injection |
+| `frontend/src/context/AuthContext.tsx` | 103 | Firebase auth context |
